@@ -1,0 +1,29 @@
+# ============================================================
+# Eskuta — Sidecar Python (FastAPI)
+# Versões fixadas conforme RELATORIO_TECNICO.md §0.5
+# ============================================================
+
+# --- API framework ---
+# Nota: versões originais do RELATORIO_TECNICO (fastapi 0.115.0, starlette
+# 0.38.6, python-multipart 0.0.12) tinham CVEs (GHSA-f96h-pmfr-66vw,
+# GHSA-2c2j-9gv5-cj73, GHSA-59g5-xgcq-4qw3, etc). Atualizado na auditoria
+# da Fase 0 — ver docs/AUDIT-FASE-0.md.
+fastapi==0.136.1
+starlette==1.0.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.29
+
+# --- Validação e settings ---
+pydantic==2.9.0
+pydantic-settings==2.5.0
+
+# --- HTTP client (chamadas a APIs externas) ---
+httpx==0.27.0
+
+# --- Banco de dados (Etapa 1.2) ---
+sqlalchemy==2.0.35
+aiosqlite==0.20.0
+alembic==1.13.3
+
+# --- Observabilidade ---
+loguru==0.7.2

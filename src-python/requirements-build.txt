@@ -1,0 +1,8 @@
+# ============================================================
+# Eskuta — Sidecar Python (build deps)
+# Usado pelo script scripts/build.* para empacotar o sidecar
+# como um executável standalone via PyInstaller. NÃO é necessário
+# em runtime.
+# ============================================================
+
+pyinstaller==6.11.0
