@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue("Hello, Eskuta! You've been greeted from Rust!"),
+  invoke: vi
+    .fn()
+    .mockResolvedValue("Hello, Eskuta! You've been greeted from Rust!"),
 }));
 
 // Mock controlado do api.ts — vi.mock() é hoisted, por isso usamos
@@ -80,7 +82,9 @@ describe("App — estados do sidecar", () => {
   });
 
   it("mostra badge de falha com status quando waitForSidecar rejeita com ApiError", async () => {
-    waitForSidecarMock.mockRejectedValue(new ApiErrorMock(503, { detail: "down" }));
+    waitForSidecarMock.mockRejectedValue(
+      new ApiErrorMock(503, { detail: "down" }),
+    );
     render(<App />);
     await waitFor(() => {
       expect(screen.getByText(/sidecar falhou/i)).toBeInTheDocument();

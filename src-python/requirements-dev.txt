@@ -11,3 +11,8 @@ pytest-cov==5.0.0
 # --- Lint e auditoria ---
 ruff==0.6.9
 pip-audit==2.7.3
+
+# --- Git hooks multi-linguagem ---
+# Após instalar este requirements, rode `pre-commit install` na raiz do
+# repo pra ativar os hooks de `.pre-commit-config.yaml`.
+pre-commit==4.0.1

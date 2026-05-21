@@ -70,6 +70,7 @@
 6. **Git** (óbvio mas seja exaustivo)
 
 **Critério de aceite:**
+
 - [ ] Todos os comandos acima retornam versão sem erro
 - [ ] `cargo --version` funciona
 - [ ] `pip --version` funciona (Python 3.11)
@@ -83,20 +84,24 @@
 **Passo a passo:**
 
 1. Criar projeto com template oficial:
+
    ```bash
    npm create tauri-app@latest eskuta
    ```
+
    - Frontend: **React**
    - Variante: **TypeScript**
    - Package manager: **npm**
 
 2. Entrar no projeto e instalar deps:
+
    ```bash
    cd eskuta
    npm install
    ```
 
 3. Rodar em dev:
+
    ```bash
    npm run tauri dev
    ```
@@ -104,6 +109,7 @@
 4. Verificar que janela abre com "Hello Tauri".
 
 **Critério de aceite:**
+
 - [ ] Janela do app abre sem erro
 - [ ] Hot-reload funciona (mude texto no `App.tsx` e veja atualizar)
 - [ ] `npm run tauri build` gera um instalador (mesmo que vazio) na pasta `src-tauri/target/release/bundle/`
@@ -117,6 +123,7 @@
 **Passo a passo:**
 
 1. Instalar Tailwind:
+
    ```bash
    npm install -D tailwindcss@latest postcss autoprefixer
    npx tailwindcss init -p
@@ -125,6 +132,7 @@
 2. Configurar `tailwind.config.js` apontando pra `./src/**/*.{ts,tsx}`.
 
 3. Adicionar diretivas no `src/index.css`:
+
    ```css
    @tailwind base;
    @tailwind components;
@@ -132,9 +140,11 @@
    ```
 
 4. Instalar Shadcn/UI:
+
    ```bash
    npx shadcn@latest init
    ```
+
    - Style: **Default**
    - Base color: **Slate** (ou sua preferência)
    - CSS variables: **Yes**
@@ -145,6 +155,7 @@
    ```
 
 **Critério de aceite:**
+
 - [ ] Botão Shadcn renderiza no `App.tsx` sem erro
 - [ ] Classes Tailwind funcionam
 - [ ] Build não quebra
@@ -208,6 +219,7 @@ eskuta/
 3. Atualizar `tsconfig.json` com `paths` se necessário (ex: `@/components`)
 
 **Critério de aceite:**
+
 - [ ] Estrutura de pastas igual à descrita
 - [ ] App ainda roda com `npm run tauri dev`
 - [ ] Imports usando alias `@/` funcionam
@@ -221,6 +233,7 @@ eskuta/
 **Passo a passo:**
 
 1. Criar virtual env:
+
    ```bash
    cd src-python
    python3.11 -m venv venv
@@ -228,6 +241,7 @@ eskuta/
    ```
 
 2. Criar `requirements.txt` com deps básicas:
+
    ```txt
    fastapi==0.115.0
    uvicorn[standard]==0.32.0
@@ -242,11 +256,13 @@ eskuta/
    ```
 
 3. Instalar:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. Criar `app/main.py`:
+
    ```python
    from fastapi import FastAPI
    from fastapi.middleware.cors import CORSMiddleware
@@ -267,6 +283,7 @@ eskuta/
    ```
 
 5. Rodar:
+
    ```bash
    uvicorn app.main:app --reload --port 8765
    ```
@@ -274,6 +291,7 @@ eskuta/
 6. Validar: abrir `http://localhost:8765/health` no browser, deve retornar `{"status":"ok"}`.
 
 **Critério de aceite:**
+
 - [ ] FastAPI sobe sem erro
 - [ ] `/health` responde
 - [ ] `/docs` (Swagger) carrega
@@ -289,6 +307,7 @@ eskuta/
 1. **Empacotar o Python com PyInstaller pra ter um binário standalone:**
 
    Criar `src-python/build_sidecar.py`:
+
    ```python
    import PyInstaller.__main__
    import platform
@@ -315,6 +334,7 @@ eskuta/
 2. **Configurar Tauri pra usar como sidecar:**
 
    No `src-tauri/tauri.conf.json`, adicionar em `bundle`:
+
    ```json
    "externalBin": [
      "binaries/eskuta-sidecar"
@@ -361,6 +381,7 @@ eskuta/
 4. **Script de build:**
 
    Criar `scripts/build.sh` (e `.bat` pra Windows) que:
+
    ```bash
    #!/bin/bash
    set -e
@@ -376,6 +397,7 @@ eskuta/
    No frontend, no `App.tsx`, fazer fetch periódico até `/health` responder, antes de mostrar UI principal.
 
 **Critério de aceite:**
+
 - [ ] `npm run tauri dev` sobe Tauri + Python juntos automaticamente
 - [ ] Fechar a janela mata o processo Python (verificar no gerenciador de tarefas)
 - [ ] Frontend consegue chamar `http://localhost:8765/health` e receber resposta
@@ -383,12 +405,12 @@ eskuta/
 
 **Riscos e mitigações:**
 
-| Risco | Mitigação |
-|-------|-----------|
-| PyInstaller não inclui módulo necessário | Adicionar em `--hidden-import` |
-| Porta 8765 ocupada | Implementar busca por porta livre dinâmica |
-| Python crasha silenciosamente | Capturar stderr no Rust e logar |
-| Antivírus bloqueia o sidecar.exe | Assinar binário com certificado (custa $$, deixar pra produção) |
+| Risco                                    | Mitigação                                                       |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| PyInstaller não inclui módulo necessário | Adicionar em `--hidden-import`                                  |
+| Porta 8765 ocupada                       | Implementar busca por porta livre dinâmica                      |
+| Python crasha silenciosamente            | Capturar stderr no Rust e logar                                 |
+| Antivírus bloqueia o sidecar.exe         | Assinar binário com certificado (custa $$, deixar pra produção) |
 
 ---
 
@@ -405,6 +427,7 @@ eskuta/
 **Passo a passo:**
 
 1. No Python, configurar Loguru em `src-python/app/core/logging.py`:
+
    ```python
    from loguru import logger
    import sys
@@ -425,6 +448,7 @@ eskuta/
    ```
 
 2. Usar em tudo:
+
    ```python
    from loguru import logger
 
@@ -432,6 +456,7 @@ eskuta/
    ```
 
 **Critério de aceite:**
+
 - [ ] Logs aparecem no console quando rodando
 - [ ] Arquivo de log é criado em `~/.eskuta/logs/`
 - [ ] Rotação funciona (testar com arquivo grande)
@@ -445,6 +470,7 @@ eskuta/
 **Passo a passo:**
 
 1. Criar `src-python/app/core/settings.py`:
+
    ```python
    from pydantic_settings import BaseSettings, SettingsConfigDict
    from pathlib import Path
@@ -488,6 +514,7 @@ eskuta/
 2. **Importante:** Em produção, as API keys NÃO vêm de `.env`. Elas são armazenadas criptografadas no banco. O `.env` é só pra desenvolvimento.
 
 **Critério de aceite:**
+
 - [ ] `from app.core.settings import settings` funciona em qualquer lugar
 - [ ] Diretórios são criados na primeira execução
 - [ ] Validação Pydantic falha gracefully se valor inválido
@@ -503,6 +530,7 @@ eskuta/
 **Passo a passo:**
 
 1. Criar `src-python/app/db/database.py`:
+
    ```python
    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
    from sqlalchemy.orm import DeclarativeBase
@@ -530,6 +558,7 @@ eskuta/
    ```
 
 2. Inicializar Alembic:
+
    ```bash
    cd src-python
    alembic init -t async migrations_alembic
@@ -544,6 +573,7 @@ eskuta/
    - Quando hora de migrar pra produção, basta rodar esse SQL no Postgres
 
 **Critério de aceite:**
+
 - [ ] `alembic upgrade head` cria as tabelas no SQLite
 - [ ] Arquivo `001_initial.sql` existe e é válido em Postgres (testar em container Docker)
 - [ ] Conexão async funciona em endpoints FastAPI
@@ -555,6 +585,7 @@ eskuta/
 **Veja o arquivo `SCHEMA_BD.xlsx` pra spec completa.** Aqui só listo o que precisa ser criado:
 
 Tabelas:
+
 1. `meetings` — uma reunião processada
 2. `transcripts` — transcrição bruta de uma reunião
 3. `transcript_segments` — segmentos com timestamp e speaker
@@ -576,6 +607,7 @@ Tabelas:
 5. Copiar SQL equivalente pra `/migrations/001_initial.sql`
 
 **Critério de aceite:**
+
 - [ ] Todas as tabelas criadas no SQLite
 - [ ] `001_initial.sql` cria tabelas idênticas no Postgres (testado)
 - [ ] Relacionamentos (FKs) funcionam
@@ -596,6 +628,7 @@ Tabelas:
 1. Instalar dep: `pip install ffmpeg-python==0.2.0`
 
 2. Criar `app/services/audio/converter.py`:
+
    ```python
    import ffmpeg
    from pathlib import Path
@@ -607,7 +640,7 @@ Tabelas:
        - 16kHz (taxa que Whisper usa internamente)
        - Mono (voz não precisa estéreo)
        - 32kbps (mais que suficiente pra voz inteligível)
-       
+
        Reduz drasticamente o tamanho. 3h de reunião em MP4 (1.5GB) vira ~40MB.
        """
        try:
@@ -634,6 +667,7 @@ Tabelas:
    ```
 
 3. Wrapper async-safe (ffmpeg é blocking, então roda em thread):
+
    ```python
    import asyncio
 
@@ -643,6 +677,7 @@ Tabelas:
    ```
 
 **Critério de aceite:**
+
 - [ ] MP4 de 1GB vira MP3 < 50MB
 - [ ] MP3 de qualquer bitrate vira MP3 16kHz mono 32kbps
 - [ ] Função é async e não bloqueia o event loop
@@ -659,6 +694,7 @@ Tabelas:
 1. Instalar dep: `pip install silero-vad==5.1.2`
 
 2. Criar `app/services/audio/vad.py`:
+
    ```python
    import torch
    from pathlib import Path
@@ -702,6 +738,7 @@ Tabelas:
    ```
 
 **Critério de aceite:**
+
 - [ ] Áudio de 1h com 20% de silêncio vira áudio de ~48min
 - [ ] Timestamps fazem sentido (validar manualmente em 2-3 amostras)
 - [ ] Processamento de 1h leva < 30s
@@ -715,6 +752,7 @@ Tabelas:
 **Passo a passo:**
 
 1. Criar `app/services/audio/chunker.py`:
+
    ```python
    from typing import List
    from pathlib import Path
@@ -771,6 +809,7 @@ Tabelas:
    ```
 
 **Critério de aceite:**
+
 - [ ] Áudio de 3h vira ~18 chunks de ~10 min cada
 - [ ] Nenhum chunk passa de 25MB (limite do Groq)
 - [ ] Cortes acontecem em silêncios, nunca no meio de fala
@@ -789,6 +828,7 @@ Tabelas:
 **Passo a passo:**
 
 1. Criar interface base em `app/services/transcription/base.py`:
+
    ```python
    from abc import ABC, abstractmethod
    from pathlib import Path
@@ -829,6 +869,7 @@ Tabelas:
    ```
 
 2. Implementar adapter Groq em `app/services/transcription/groq_provider.py`:
+
    ```python
    from groq import AsyncGroq
    from app.services.transcription.base import TranscriptionProvider, TranscriptionResult
@@ -877,6 +918,7 @@ Tabelas:
 3. Implementar adapter AssemblyAI em `app/services/transcription/assemblyai_provider.py` (similar, com API deles).
 
 **Critério de aceite:**
+
 - [ ] Ambos providers implementam a mesma interface
 - [ ] Resultado normalizado idêntico independente do provider
 - [ ] `is_available()` retorna `False` quando API key faltando
@@ -890,6 +932,7 @@ Tabelas:
 **Passo a passo:**
 
 1. Criar `app/services/transcription/router.py`:
+
    ```python
    from typing import List
    from app.services.transcription.base import TranscriptionProvider, TranscriptionResult
@@ -929,6 +972,7 @@ Tabelas:
    ```
 
 2. Endpoint FastAPI em `app/api/transcription.py`:
+
    ```python
    from fastapi import APIRouter, BackgroundTasks
    from app.services.transcription.router import TranscriptionRouter
@@ -943,6 +987,7 @@ Tabelas:
    ```
 
 **Critério de aceite:**
+
 - [ ] Com Groq disponível, sempre tenta Groq primeiro
 - [ ] Quando Groq retorna 429 (rate limit), retry com backoff exponencial
 - [ ] Se Groq falhar 3x, cai pra AssemblyAI
@@ -958,6 +1003,7 @@ Tabelas:
 **Passo a passo:**
 
 1. Criar `app/services/transcription/parallel.py`:
+
    ```python
    import asyncio
    from app.core.settings import settings
@@ -999,6 +1045,7 @@ Tabelas:
    ```
 
 **Critério de aceite:**
+
 - [ ] 18 chunks transcritos em paralelo (max 4 simultâneos)
 - [ ] Semáforo respeitado (verificar logs)
 - [ ] Timestamps absolutos batem com o áudio original
@@ -1015,6 +1062,7 @@ Tabelas:
 **Passo a passo:**
 
 1. Instalar:
+
    ```bash
    pip install pyannote.audio==3.3.2
    ```
@@ -1025,6 +1073,7 @@ Tabelas:
    - **Importante:** o token é da configuração do APP, não do usuário final. Documentar isso pro instalador.
 
 3. Criar `app/services/diarization/pyannote_service.py`:
+
    ```python
    from pyannote.audio import Pipeline
    from pathlib import Path
@@ -1062,6 +1111,7 @@ Tabelas:
    ```
 
 **Critério de aceite:**
+
 - [ ] Modelo baixa na primeira execução (~500MB)
 - [ ] Diarização de 1h leva < 5 min em CPU decente
 - [ ] Speakers identificados batem com a realidade (validar 2-3 amostras)
@@ -1104,6 +1154,7 @@ Tabelas:
    ```
 
 **Critério de aceite:**
+
 - [ ] Cada segmento de transcrição tem um speaker atribuído
 - [ ] Speakers diferentes em momentos diferentes da reunião (validar)
 - [ ] Quando há sobreposição, prevalece o speaker dominante
@@ -1121,6 +1172,7 @@ Tabelas:
 3. Aplicar nomes ao gerar a ata
 
 **Critério de aceite:**
+
 - [ ] Usuário consegue renomear speakers
 - [ ] Ata gerada usa nomes em vez de SPEAKER_XX
 - [ ] Mapeamento persiste entre execuções
@@ -1136,6 +1188,7 @@ Tabelas:
 **Passo a passo:**
 
 1. Interface em `app/services/llm/base.py`:
+
    ```python
    from abc import ABC, abstractmethod
    from dataclasses import dataclass
@@ -1194,6 +1247,7 @@ Tabelas:
    - Gemini: `gemini-2.5-flash`
 
 **Critério de aceite:**
+
 - [ ] Os 3 providers implementam a mesma interface
 - [ ] Cada um retorna `LLMResponse` normalizado
 - [ ] JSON mode funciona em todos (necessário pra ata estruturada)
@@ -1205,6 +1259,7 @@ Tabelas:
 **Passo a passo:**
 
 1. Criar `app/services/llm/router.py`:
+
    ```python
    from app.services.llm.base import LLMProvider
    from app.services.llm.claude_provider import ClaudeProvider
@@ -1236,6 +1291,7 @@ Tabelas:
    ```
 
 **Critério de aceite:**
+
 - [ ] Usuário consegue escolher provider via setting
 - [ ] Se provider escolhido não tem key, sistema avisa e oferece outro
 - [ ] Troca de provider é transparente pro resto do código
@@ -1251,25 +1307,31 @@ Tabelas:
 A gente vai aplicar 6 técnicas combinadas:
 
 **1. Temperature zero ou muito baixa**
+
 - STT: `temperature=0`
 - LLM: `temperature=0.2` (precisa de um pouco pra fluidez na escrita, mas nada criativo)
 
 **2. Citação obrigatória de evidências**
+
 - Toda decisão / action item / fato afirmado pela ata DEVE incluir o trecho exato da transcrição que originou
 - Se LLM não consegue citar, deixa em branco (não inventa)
 
 **3. Output estruturado (JSON Schema rigoroso)**
+
 - LLM responde em JSON com campos previsíveis
 - Campos vazios = `null` ou `[]`, NUNCA texto criativo
 
 **4. Validação cruzada (LLM-as-judge)**
+
 - Depois da ata, segunda chamada de LLM verifica se ata bate com transcrição
 - Se encontra inconsistência, regenera
 
 **5. Few-shot com exemplos concretos**
+
 - Mostrar pro LLM 1-2 exemplos de ata boa antes de pedir a nova
 
 **6. Chain-of-thought explícito**
+
 - LLM "raciocina" antes de produzir output final
 
 ### Etapa 1.7.2 — Implementação do JSON Schema
@@ -1277,6 +1339,7 @@ A gente vai aplicar 6 técnicas combinadas:
 **Passo a passo:**
 
 1. Criar `app/services/minutes/schemas.py`:
+
    ```python
    from pydantic import BaseModel, Field
    from typing import List, Optional
@@ -1316,6 +1379,7 @@ A gente vai aplicar 6 técnicas combinadas:
    ```
 
 2. Forçar uso do schema na chamada do LLM:
+
    ```python
    # Claude
    response = await client.messages.create(
@@ -1344,6 +1408,7 @@ A gente vai aplicar 6 técnicas combinadas:
    ```
 
 **Critério de aceite:**
+
 - [ ] LLM sempre retorna JSON parseável
 - [ ] Todos os campos opcionais aparecem como `null` quando aplicável (não inventados)
 - [ ] Todo `action_item` tem `evidence` obrigatório
@@ -1358,6 +1423,7 @@ A gente vai aplicar 6 técnicas combinadas:
 **Passo a passo:**
 
 1. Criar `app/services/minutes/validator.py`:
+
    ```python
    from rapidfuzz import fuzz
 
@@ -1404,6 +1470,7 @@ A gente vai aplicar 6 técnicas combinadas:
 3. No pipeline da ata: depois de gerar, validar. Se tem problemas, regerar com prompt corretivo destacando os problemas encontrados.
 
 **Critério de aceite:**
+
 - [ ] Quotes inventadas são detectadas
 - [ ] Quotes reais (mesmo com pequena normalização) passam
 - [ ] Threshold 85% é bom equilíbrio (testar com amostras)
@@ -1420,7 +1487,7 @@ A gente vai aplicar 6 técnicas combinadas:
 
 1. Criar `app/services/minutes/prompts.py`:
 
-```python
+````python
 SYSTEM_PROMPT_MINUTES = """Você é Eskuta, uma assistente especialista em criar atas de reunião profissionais em português brasileiro.
 
 # SEU PAPEL
@@ -1500,7 +1567,7 @@ Responda APENAS com JSON válido seguindo este schema:
   ],
   "open_questions": ["Pontos discutidos mas não resolvidos"]
 }
-```
+````
 
 # EXEMPLO DE RESPOSTA BOA
 
@@ -1508,6 +1575,7 @@ Transcrição (entrada):
 "João: Pessoal, sobre o projeto Alpha, eu acho que a gente deveria adiar pra próxima sprint. Maria: Concordo, mas precisamos avisar o cliente. João: Beleza, eu falo com ele até sexta. Maria: E sobre o orçamento de design? João: A gente fechou em 15 mil mês passado, lembra? Maria: Ah verdade. Então só falta a aprovação do diretor. João: Eu mando email pra ele hoje."
 
 Resposta (saída):
+
 ```json
 {
   "title": "Alinhamento Projeto Alpha e Orçamento Design",
@@ -1573,13 +1641,14 @@ Resposta (saída):
 # ANTI-EXEMPLO (NUNCA FAÇA ISSO)
 
 NÃO produza output assim:
+
 ```json
 {
   "action_items": [
     {
-      "description": "Revisar todas as métricas do projeto",  // ❌ NÃO foi dito isso
-      "assigned_to": "Equipe",  // ❌ inventou um "responsável genérico"
-      "deadline": "próxima semana"  // ❌ não foi mencionado
+      "description": "Revisar todas as métricas do projeto", // ❌ NÃO foi dito isso
+      "assigned_to": "Equipe", // ❌ inventou um "responsável genérico"
+      "deadline": "próxima semana" // ❌ não foi mencionado
     }
   ]
 }
@@ -1587,7 +1656,8 @@ NÃO produza output assim:
 
 Lembre-se: PREFIRO UMA ATA COM POUCOS ITENS VERDADEIROS A UMA ATA INFLADA COM INVENÇÕES.
 """
-```
+
+````
 
 **Critério de aceite:**
 - [ ] Prompt está em arquivo separado, versionado
@@ -1628,11 +1698,12 @@ Retorne JSON com a lista de problemas. Se não houver problemas, retorne lista v
     }
   ]
 }
-```
+````
 
 Seja CRÍTICO. Prefira reportar uma suspeita do que deixar passar uma invenção.
 """
-```
+
+````
 
 **Critério de aceite:**
 - [ ] LLM validador detecta inconsistências quando inseridas artificialmente
@@ -1721,9 +1792,10 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 
     db_save_minutes(meeting_id, minutes)
     db_update_status(meeting_id, "completed")
-```
+````
 
 **Critério de aceite:**
+
 - [ ] Status no DB atualizado em cada estágio (UI pode mostrar progresso real)
 - [ ] Erro em qualquer estágio é capturado e marcado como `failed` com mensagem clara
 - [ ] Reunião de 2h é processada end-to-end em < 5 minutos (com Groq)
@@ -1751,6 +1823,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    - Remove duplicatas, agrupa similares
 
 **Critério de aceite:**
+
 - [ ] Reunião de 3h gera ata coerente, sem perder informação
 - [ ] Custo total de LLM é razoável (< $0.50 com Claude)
 - [ ] Tempo total de geração de ata < 90s
@@ -1792,6 +1865,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    ```
 
 **Critério de aceite:**
+
 - [ ] Navegação entre telas funciona
 - [ ] Layout responsivo (mínimo 800x600)
 - [ ] Onboarding aparece SÓ na primeira execução
@@ -1803,10 +1877,14 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 **Passo a passo:**
 
 1. Criar `src/lib/api.ts`:
+
    ```typescript
    const BASE_URL = "http://localhost:8765";
 
-   export async function api<T>(path: string, options?: RequestInit): Promise<T> {
+   export async function api<T>(
+     path: string,
+     options?: RequestInit,
+   ): Promise<T> {
      const res = await fetch(`${BASE_URL}${path}`, {
        ...options,
        headers: {
@@ -1836,6 +1914,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 2. Tipos TypeScript em `src/types/meeting.ts` espelhando Pydantic.
 
 **Critério de aceite:**
+
 - [ ] Todas as chamadas centralizadas em `api.ts`
 - [ ] Tipos batem com schemas do backend
 - [ ] Erros têm tratamento consistente
@@ -1857,6 +1936,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    - Pronto! ✅
 
 **Critério de aceite:**
+
 - [ ] Drag & drop funciona pra MP3, MP4, M4A, WAV
 - [ ] Validação de tamanho (max 500MB) e formato
 - [ ] Progresso atualiza em tempo real (sem precisar refresh)
@@ -1892,6 +1972,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 **Crítico:** botão "ver trecho original" abre modal com a citação da transcrição. Usuário audita facilmente.
 
 **Critério de aceite:**
+
 - [ ] Ata renderiza bonita com tipografia clean
 - [ ] Toggle pra ver evidências de cada item
 - [ ] Botão de exportar (Markdown, PDF — PDF na V2)
@@ -1915,6 +1996,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 2. Instalar: `pip install keyring==25.4.1`
 
 3. Criar `app/services/keys.py`:
+
    ```python
    import keyring
    from typing import Optional
@@ -1944,6 +2026,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    ```
 
 **Critério de aceite:**
+
 - [ ] Keys salvas no keyring do OS (não em arquivo)
 - [ ] Listar providers configurados não revela as keys
 - [ ] Funciona em Windows e macOS
@@ -1991,6 +2074,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 4. Repetir pros outros providers com links e instruções específicas.
 
 **Critério de aceite:**
+
 - [ ] Instruções claras pra cada provider
 - [ ] Botão "abrir site" abre no browser do usuário (não webview do app)
 - [ ] Teste de conectividade após salvar (verifica se key é válida)
@@ -2038,6 +2122,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    ```
 
 2. Configurar `tauri.conf.json`:
+
    ```json
    {
      "productName": "Eskuta",
@@ -2070,6 +2155,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    - Tempo de build: 5-10 min na primeira vez
 
 **Critério de aceite:**
+
 - [ ] Comando único (`bash scripts/build.sh`) gera o instalador
 - [ ] Instalador funciona em máquina limpa (sem Python instalado)
 - [ ] Primeira execução cria diretórios corretos em `~/.eskuta/`
@@ -2086,6 +2172,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 1. Habilitar plugin oficial: `cargo add tauri-plugin-updater`
 
 2. Configurar em `tauri.conf.json`:
+
    ```json
    "plugins": {
      "updater": {
@@ -2099,6 +2186,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 4. Implementar no frontend o check + prompt de instalação
 
 **Critério de aceite:**
+
 - [ ] App verifica update no startup
 - [ ] Notifica usuário quando há nova versão
 - [ ] Update aplicado com 1 clique
@@ -2120,6 +2208,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 3. Empacota em ZIP pra usuário enviar
 
 **Critério de aceite:**
+
 - [ ] ZIP gerado contém todos os logs relevantes
 - [ ] API keys NÃO aparecem nos logs (mascarar antes)
 - [ ] Tamanho razoável (< 10MB normalmente)
@@ -2143,6 +2232,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 **Passo a passo:**
 
 1. Adicionar dependências Rust em `src-tauri/Cargo.toml`:
+
    ```toml
    [dependencies]
    cpal = "0.15"
@@ -2151,6 +2241,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    ```
 
 2. Criar `src-tauri/src/audio/system_capture_windows.rs`:
+
    ```rust
    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
    use std::sync::mpsc;
@@ -2216,6 +2307,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 3. **Atenção a issues conhecidos do cpal no Windows:** WASAPI exclusivo vs compartilhado. Use sempre compartilhado.
 
 **Critério de aceite:**
+
 - [ ] App captura áudio do sistema enquanto Spotify toca uma música (teste prático)
 - [ ] Buffer cresce conforme áudio é capturado
 - [ ] Stop encerra o stream limpo
@@ -2228,6 +2320,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 **Passo a passo:**
 
 1. Criar `src-tauri/src/audio/microphone.rs`:
+
    ```rust
    pub struct MicrophoneCapture {
        stream: Option<cpal::Stream>,
@@ -2250,6 +2343,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 2. UI: dropdown pra usuário escolher qual microfone (caso tenha vários).
 
 **Critério de aceite:**
+
 - [ ] Lista de microfones disponíveis aparece na UI
 - [ ] Usuário pode trocar mic em tempo real (sem reiniciar app)
 - [ ] Indicador visual de "volume" do mic (medidor de pico)
@@ -2263,17 +2357,18 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 ### Etapa 2.2.1 — Decisão: ScreenCaptureKit (macOS 13+)
 
 **Por que esse caminho?**
+
 - API oficial moderna, sem precisar de driver virtual
 - Mas: precisa de permissão de gravação de tela (modal assustador na primeira vez)
 - Funciona a partir de macOS 13 Ventura
 
 **Trade-offs:**
 
-| Abordagem | Prós | Contras |
-|-----------|------|---------|
-| ScreenCaptureKit | API oficial, sem driver | Permissão de tela, macOS 13+ |
-| BlackHole (virtual audio driver) | Funciona em qualquer macOS | Usuário instala driver (UX ruim) |
-| CoreAudio TAP (macOS 14.4+) | API moderna, sem permissão de tela | Só macOS 14.4+ |
+| Abordagem                        | Prós                               | Contras                          |
+| -------------------------------- | ---------------------------------- | -------------------------------- |
+| ScreenCaptureKit                 | API oficial, sem driver            | Permissão de tela, macOS 13+     |
+| BlackHole (virtual audio driver) | Funciona em qualquer macOS         | Usuário instala driver (UX ruim) |
+| CoreAudio TAP (macOS 14.4+)      | API moderna, sem permissão de tela | Só macOS 14.4+                   |
 
 **Decisão recomendada:** ScreenCaptureKit + fallback pra instruções de BlackHole se permissão negada.
 
@@ -2284,6 +2379,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 1. Usar crate: `screencapturekit = "0.3"`
 
 2. Criar `src-tauri/src/audio/system_capture_macos.rs`:
+
    ```rust
    #[cfg(target_os = "macos")]
    use screencapturekit::{
@@ -2303,6 +2399,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    - Se não, mostrar modal explicando: "Pra capturar áudio das reuniões, precisamos da permissão de Gravação de Tela. Não vamos gravar sua tela, só capturar o áudio que sai pelos alto-falantes."
 
 **Critério de aceite:**
+
 - [ ] Funciona no macOS 13+
 - [ ] Modal de permissão é amigável
 - [ ] Fallback claro pra macOS < 13 (instruções pra BlackHole)
@@ -2323,6 +2420,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 1. Dep: `rubato = "0.15"` (resampling de alta qualidade em Rust)
 
 2. Resampler que converte tudo pra 16kHz (mesma taxa do Whisper):
+
    ```rust
    use rubato::{FftFixedIn, Resampler};
 
@@ -2348,6 +2446,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 1. Após resampling, ambos os streams estão em 16kHz mono.
 
 2. Mix simples (média dos samples):
+
    ```rust
    pub fn mix_audio(a: &[f32], b: &[f32]) -> Vec<f32> {
        let len = a.len().min(b.len());
@@ -2369,6 +2468,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    ```
 
 **Critério de aceite:**
+
 - [ ] Audio mixado sem clipping
 - [ ] Voz do usuário + voz dos outros participantes ambas audíveis
 - [ ] Latência adicionada pela mixagem < 50ms
@@ -2380,6 +2480,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 > **Decisão arquitetural importante:** NÃO vamos fazer streaming verdadeiro (WebSocket persistente) no MVP de tempo real. Vamos fazer chunks de 30s mandados em batch pro Groq.
 >
 > **Por quê?** Streaming real exige Deepgram pago. Chunks de 30s no Groq batch são:
+>
 > - Gratuitos (free tier cobre)
 > - Latência aceitável (~5s percebida)
 > - Reaproveitam 100% da arquitetura do MVP
@@ -2389,6 +2490,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 **Passo a passo:**
 
 1. Buffer de 30s rotativo no Rust:
+
    ```rust
    pub struct AudioBuffer {
        samples: Vec<f32>,
@@ -2414,6 +2516,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
    ```
 
 2. A cada 30s, exporta o chunk como WAV temporário e manda pro sidecar Python via HTTP:
+
    ```rust
    #[tauri::command]
    async fn process_audio_chunk(samples: Vec<f32>) -> Result<String, String> {
@@ -2436,6 +2539,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 3. Sidecar Python expõe endpoint `/realtime/chunk` que usa o router de transcrição (mesma camada do MVP).
 
 **Critério de aceite:**
+
 - [ ] Chunks de 30s gerados consistentemente
 - [ ] Latência total (fala -> texto na UI) < 10s
 - [ ] Sem perda de áudio nas fronteiras dos chunks (overlap de 2s recomendado)
@@ -2447,6 +2551,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 **Problema:** se cortar em 30s exatos, palavra pode partir no meio.
 
 **Solução:** chunks de 32s com 2s de overlap. Resultado:
+
 - Chunk 1: [0s - 32s]
 - Chunk 2: [30s - 62s]
 - ... e assim por diante
@@ -2454,6 +2559,7 @@ async def process_meeting(meeting_id: str, audio_path: Path):
 Na hora de mesclar transcrições, deduplica o overlap usando algoritmo de alinhamento de strings.
 
 **Critério de aceite:**
+
 - [ ] Palavras nas fronteiras dos chunks aparecem na transcrição final
 - [ ] Sem duplicação no merge
 - [ ] Timestamps consistentes
@@ -2480,6 +2586,7 @@ Na hora de mesclar transcrições, deduplica o overlap usando algoritmo de alinh
 ```
 
 **Características:**
+
 - Janela pequena (~320x400)
 - "Always on top" (configurável)
 - Posicionável no canto
@@ -2499,6 +2606,7 @@ Na hora de mesclar transcrições, deduplica o overlap usando algoritmo de alinh
 3. Implementar handlers no Rust
 
 **Critério de aceite:**
+
 - [ ] Hotkeys funcionam mesmo com app minimizado
 - [ ] Não conflitam com hotkeys de plataformas comuns (Zoom, Meet)
 
@@ -2518,6 +2626,7 @@ Na hora de mesclar transcrições, deduplica o overlap usando algoritmo de alinh
    - Click direito: menu rápido (iniciar, parar, abrir app)
 
 **Critério de aceite:**
+
 - [ ] Ícone visível na tray do Windows / menu bar do Mac
 - [ ] Estado visual reflete situação real
 - [ ] Click esquerdo abre janela principal
@@ -2533,6 +2642,7 @@ Na hora de mesclar transcrições, deduplica o overlap usando algoritmo de alinh
 **Passo a passo:**
 
 1. Em paralelo aos chunks de 30s sendo transcritos, salvar o áudio completo num arquivo:
+
    ```rust
    pub struct FullRecorder {
        file: hound::WavWriter<BufWriter<File>>,
@@ -2563,6 +2673,7 @@ Notifica usuário
 ```
 
 **Critério de aceite:**
+
 - [ ] Áudio completo é preservado mesmo se app crashar
 - [ ] Reprocessamento usa exatamente o mesmo pipeline da Fase 1
 - [ ] Ata final tem qualidade MUITO superior à transcrição "ao vivo"
@@ -2579,6 +2690,7 @@ Notifica usuário
 ### 3.1.1 — Migrar SQLite → Postgres
 
 **Por que migrar:**
+
 - Multi-usuário simultâneo
 - Backup centralizado
 - Sync entre dispositivos
@@ -2591,6 +2703,7 @@ Notifica usuário
    - Aplicar uma a uma na nova instância
 
 2. **Trocar driver no SQLAlchemy:**
+
    ```python
    # De:
    engine = create_async_engine(f"sqlite+aiosqlite:///{settings.DB_PATH}")
@@ -2609,6 +2722,7 @@ Notifica usuário
    - Validar contagens e checksums
 
 **Critério de aceite:**
+
 - [ ] Mesma aplicação roda em SQLite (dev/local) e Postgres (prod) sem alteração de código
 - [ ] Migrations versionadas e idempotentes
 - [ ] Tests passam contra ambos
@@ -2634,6 +2748,7 @@ Notifica usuário
 ```
 
 **Decisões:**
+
 - **Hospedagem:** Railway, Fly.io ou DigitalOcean App Platform (custo baixo pra começar)
 - **Storage de áudio:** S3 compatible (R2 da Cloudflare é barato)
 - **Auth:** Auth0 ou Clerk (não reinventar a roda)
@@ -2660,14 +2775,15 @@ Notifica usuário
 
 **Sugestão de planos:**
 
-| Plano | Preço | Limite | Diferencial |
-|-------|-------|--------|-------------|
-| Free | R$ 0 | 5h/mês | Marca d'água na ata, fila secundária |
-| Pessoal | R$ 29/mês | 30h/mês | Sem marca, prioridade normal |
-| Pro | R$ 79/mês | 100h/mês | Diarização, exportação PDF, integrações |
-| Empresarial | R$ 199/mês | 500h/mês | Multi-user, SSO, retenção customizada |
+| Plano       | Preço      | Limite   | Diferencial                             |
+| ----------- | ---------- | -------- | --------------------------------------- |
+| Free        | R$ 0       | 5h/mês   | Marca d'água na ata, fila secundária    |
+| Pessoal     | R$ 29/mês  | 30h/mês  | Sem marca, prioridade normal            |
+| Pro         | R$ 79/mês  | 100h/mês | Diarização, exportação PDF, integrações |
+| Empresarial | R$ 199/mês | 500h/mês | Multi-user, SSO, retenção customizada   |
 
 **Implementação:**
+
 - Stripe Customer Portal pra gerenciar plano
 - Webhooks pra sincronizar status
 - Soft-limit (avisa) e hard-limit (bloqueia)
@@ -2709,16 +2825,16 @@ Notifica usuário
 
 ## 3.2 Roadmap Pós-MVP/Real-time pra Produto Comercial
 
-| Sprint | Foco | Entregável |
-|--------|------|------------|
-| S1 | Backend cloud + auth | Backend prod no ar, registro e login funcionando |
-| S2 | Migração de dados | Tool de migrate SQLite local → cloud |
-| S3 | Pagamentos | Stripe integrado, 3 planos funcionando |
-| S4 | Quotas e billing | Limites mensais aplicados, downgrade gracioso |
-| S5 | Marketing site | Landing page, blog, docs |
-| S6 | Beta privado | 20 usuários pagos selecionados |
-| S7-8 | Bugs e refinamento | Baseado em feedback do beta |
-| S9 | Launch público | Product Hunt, Hacker News, etc |
+| Sprint | Foco                 | Entregável                                       |
+| ------ | -------------------- | ------------------------------------------------ |
+| S1     | Backend cloud + auth | Backend prod no ar, registro e login funcionando |
+| S2     | Migração de dados    | Tool de migrate SQLite local → cloud             |
+| S3     | Pagamentos           | Stripe integrado, 3 planos funcionando           |
+| S4     | Quotas e billing     | Limites mensais aplicados, downgrade gracioso    |
+| S5     | Marketing site       | Landing page, blog, docs                         |
+| S6     | Beta privado         | 20 usuários pagos selecionados                   |
+| S7-8   | Bugs e refinamento   | Baseado em feedback do beta                      |
+| S9     | Launch público       | Product Hunt, Hacker News, etc                   |
 
 ---
 
@@ -2792,6 +2908,7 @@ Notifica usuário
 **Cobertura mínima:** 70%
 
 Onde focar:
+
 - [ ] Conversão e compressão de áudio
 - [ ] VAD e chunking (com fixtures de áudio real)
 - [ ] Adapters de transcrição (com mocks de API)
@@ -2825,14 +2942,14 @@ Antes de cada release:
 
 ### Métricas técnicas (sempre monitorar)
 
-| Métrica | Target | Como medir |
-|---------|--------|------------|
-| Tempo médio de transcrição (1h áudio) | < 90s | Logs do pipeline |
-| Taxa de fallback Groq → AssemblyAI | < 5% | Métricas no DB |
-| Custo médio por reunião | < $0.10 | API responses |
-| Quality score da ata (manual) | 8/10 | Survey após geração |
-| % de evidências validadas com sucesso | > 90% | Validator output |
-| Crashes / 100 reuniões | < 1 | Sentry |
+| Métrica                               | Target  | Como medir          |
+| ------------------------------------- | ------- | ------------------- |
+| Tempo médio de transcrição (1h áudio) | < 90s   | Logs do pipeline    |
+| Taxa de fallback Groq → AssemblyAI    | < 5%    | Métricas no DB      |
+| Custo médio por reunião               | < $0.10 | API responses       |
+| Quality score da ata (manual)         | 8/10    | Survey após geração |
+| % de evidências validadas com sucesso | > 90%   | Validator output    |
+| Crashes / 100 reuniões                | < 1     | Sentry              |
 
 ### Métricas de produto (pós-MVP)
 
@@ -2854,6 +2971,7 @@ Antes de cada release:
 **Contexto:** App vai ficar aberto durante reuniões longas, captura de áudio nativa é crítica.
 
 **Razões:**
+
 - Instalador 10x menor (~15MB vs ~200MB)
 - 3x menos consumo de RAM
 - Acesso direto às APIs nativas via Rust
@@ -2868,6 +2986,7 @@ Antes de cada release:
 **Decisão:** Groq Whisper Large v3 Turbo como STT primário.
 
 **Razões:**
+
 - Free tier extremamente generoso (2h de áudio por hora)
 - 228x velocidade real-time (60min → 16s)
 - Mesmo modelo que OpenAI mas 89% mais barato
@@ -2880,6 +2999,7 @@ Antes de cada release:
 **Decisão:** Rodar pyannote.audio localmente.
 
 **Razões:**
+
 - Zero custo por uso
 - Privacidade (áudio não sai da máquina)
 - Qualidade SOTA
@@ -2895,6 +3015,7 @@ Antes de cada release:
 **Decisão:** Usar chunks batch de 30s ao invés de streaming verdadeiro.
 
 **Razões:**
+
 - Reusa 100% da infra do MVP de upload
 - Free tier do Groq cobre
 - Latência aceitável (~5s) pra uso do produto
@@ -2908,6 +3029,7 @@ Antes de cada release:
 **Decisão:** Começar com SQLite, migrar pra Postgres na Fase 3.
 
 **Razões:**
+
 - Zero config pra app desktop local
 - Migrations escritas compatíveis com Postgres desde o dia 1
 - Postgres só faz sentido quando tiver multi-user real
@@ -2977,6 +3099,7 @@ Antes de cada release:
 Quando todas essas caixinhas estiverem marcadas, MVP tá pronto pra usuário real:
 
 ### Funcional
+
 - [ ] Upload de MP3/MP4 até 500MB funciona
 - [ ] Transcrição de 1h leva < 90s
 - [ ] Ata gerada tem decisões e action items
@@ -2987,6 +3110,7 @@ Quando todas essas caixinhas estiverem marcadas, MVP tá pronto pra usuário rea
 - [ ] Configurações salvas persistem
 
 ### Técnico
+
 - [ ] Build gera 1 instalador único por SO
 - [ ] Sidecar Python inicia e fecha graciosamente
 - [ ] Logs em `~/.eskuta/logs/` rotacionam
@@ -2996,6 +3120,7 @@ Quando todas essas caixinhas estiverem marcadas, MVP tá pronto pra usuário rea
 - [ ] Zero vulnerabilidades em `npm audit` e `pip-audit`
 
 ### UX
+
 - [ ] App abre em < 3 segundos
 - [ ] Progresso visível em todo processamento longo
 - [ ] Mensagens de erro em português claro
@@ -3003,6 +3128,7 @@ Quando todas essas caixinhas estiverem marcadas, MVP tá pronto pra usuário rea
 - [ ] Onboarding leva < 2 min pra alguém destreinado
 
 ### Documentação
+
 - [ ] Este relatório técnico atualizado
 - [ ] README com instruções de dev
 - [ ] CHANGELOG das versões

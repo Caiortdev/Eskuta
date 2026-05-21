@@ -42,6 +42,7 @@ Não é mais um "Otter" ou "Fireflies". Os pontos onde a gente vai brigar:
 A escolha de cada peça tem motivo. Não escolhi nada "porque tá na moda".
 
 ### Frontend
+
 **React + TypeScript + TailwindCSS**
 
 - React é o padrão de mercado, qualquer dev pega rápido
@@ -49,6 +50,7 @@ A escolha de cada peça tem motivo. Não escolhi nada "porque tá na moda".
 - Tailwind pra não ficar perdendo tempo com CSS
 
 ### Backend Local (Sidecar)
+
 **Python + FastAPI**
 
 - Python porque o ecossistema de áudio/ML é dele (ffmpeg-python, pyannote, librosa, etc.)
@@ -56,6 +58,7 @@ A escolha de cada peça tem motivo. Não escolhi nada "porque tá na moda".
 - **Por que não Django?** Django é overkill pra rodar como sidecar local. FastAPI inicia mais rápido, consome menos memória e é mais simples de empacotar no PyInstaller.
 
 ### Wrapper Desktop
+
 **Tauri (Rust)**
 
 - 10x menor que Electron no instalador (~15MB vs ~200MB)
@@ -64,6 +67,7 @@ A escolha de cada peça tem motivo. Não escolhi nada "porque tá na moda".
 - WebView nativa do SO (não embute Chromium)
 
 ### Banco de Dados
+
 **SQLite (local) → Postgres (produção/cloud no futuro)**
 
 - SQLite zero-config pra app local, embarcado direto no Tauri
@@ -73,15 +77,18 @@ A escolha de cada peça tem motivo. Não escolhi nada "porque tá na moda".
 ### APIs Externas (configuráveis pelo usuário)
 
 **Transcrição (STT):**
+
 - **Primária:** Groq Whisper Large v3 Turbo (free tier generoso)
 - **Fallback:** AssemblyAI (100h grátis, melhor diarização)
 
 **LLM (geração de ata):**
+
 - **Claude** (Anthropic) — escolha padrão por qualidade superior em raciocínio
 - **GPT** (OpenAI)
 - **Gemini** (Google)
 
 **Diarização (separar quem falou):**
+
 - **pyannote.audio** (open-source, roda local)
 
 ---
@@ -126,9 +133,11 @@ A escolha de cada peça tem motivo. Não escolhi nada "porque tá na moda".
 ## 🗺️ Roadmap em Fases
 
 ### 🟢 Fase 0 — Setup (1 semana)
+
 Ambiente de desenvolvimento, scaffolding, build pipeline funcionando.
 
 ### 🟢 Fase 1 — MVP Upload (4-6 semanas)
+
 - Upload de MP3/MP4 (até 3h)
 - Pipeline de transcrição com fallback (Groq → AssemblyAI)
 - Geração de ata com LLM configurável (Claude/GPT/Gemini)
@@ -137,6 +146,7 @@ Ambiente de desenvolvimento, scaffolding, build pipeline funcionando.
 - **Critério de sucesso:** você consegue jogar uma reunião sua de 2h, esperar ~3 min, e ter uma ata útil de verdade
 
 ### 🟡 Fase 2 — Tempo Real (4-6 semanas após Fase 1 validada)
+
 - Captura de áudio do sistema operacional (mic + sistema)
 - Transcrição "quase real-time" via chunks
 - UI minimalista durante reunião
@@ -144,7 +154,9 @@ Ambiente de desenvolvimento, scaffolding, build pipeline funcionando.
 - **Critério de sucesso:** você liga o modo durante uma reunião de Meet, fala normalmente, e ao final tem ata
 
 ### 🔵 Fase 3 — Produto Pago (quando MVP+Real-time estiverem maduros)
+
 Detalhes no relatório técnico. Inclui:
+
 - Multi-tenant / contas de usuário
 - Backend hospedado
 - Sync entre devices
@@ -153,6 +165,7 @@ Detalhes no relatório técnico. Inclui:
 - Time de suporte
 
 ### 🟣 Fase 4 — Integrações (V2)
+
 Google Meet via bot (Recall.ai ou Vexa), Microsoft Teams nativo, Zoom, integrações com Notion/Slack/Trello.
 
 ---
@@ -161,26 +174,26 @@ Google Meet via bot (Recall.ai ou Vexa), Microsoft Teams nativo, Zoom, integraç
 
 Termos que vão aparecer durante o projeto. Se você travar em algum, consulta aqui.
 
-| Termo | O que significa |
-|-------|-----------------|
-| **STT** | Speech-to-Text. Transformar áudio em texto. (Whisper, Deepgram, AssemblyAI) |
-| **LLM** | Large Language Model. Modelo de linguagem grande. (Claude, GPT, Gemini, Llama) |
-| **Diarização** | Identificar QUEM falou o quê numa gravação multi-falante. |
-| **VAD** | Voice Activity Detection. Detector que separa fala de silêncio. |
-| **WER** | Word Error Rate. Métrica de qualidade de transcrição (quanto menor, melhor). |
-| **Chunking** | Cortar áudio em pedaços menores pra processar em paralelo. |
-| **Sidecar** | Processo separado que roda junto com o app principal (no nosso caso, FastAPI dentro do Tauri). |
-| **Few-shot prompting** | Dar exemplos pro LLM antes de pedir pra ele fazer algo. |
-| **Chain-of-thought** | Forçar o LLM a "pensar passo a passo" antes de responder. |
-| **Alucinação** | Quando a IA inventa informação que não estava no input. |
-| **Fallback** | Plano B quando o plano A falha. (Groq cai → AssemblyAI assume) |
-| **Free tier** | Plano gratuito de uma API. |
-| **Rate limit** | Limite de requisições por tempo. |
-| **WebView** | Componente do SO que renderiza HTML (usado pelo Tauri). |
-| **PyInstaller** | Ferramenta que empacota um app Python em executável. |
-| **WASAPI** | API de áudio do Windows que permite captura de loopback (áudio do sistema). |
-| **ScreenCaptureKit** | API de captura de tela/áudio do macOS 13+. |
-| **Content Protection** | Flag que esconde uma janela de softwares de captura de tela. |
+| Termo                  | O que significa                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| **STT**                | Speech-to-Text. Transformar áudio em texto. (Whisper, Deepgram, AssemblyAI)                    |
+| **LLM**                | Large Language Model. Modelo de linguagem grande. (Claude, GPT, Gemini, Llama)                 |
+| **Diarização**         | Identificar QUEM falou o quê numa gravação multi-falante.                                      |
+| **VAD**                | Voice Activity Detection. Detector que separa fala de silêncio.                                |
+| **WER**                | Word Error Rate. Métrica de qualidade de transcrição (quanto menor, melhor).                   |
+| **Chunking**           | Cortar áudio em pedaços menores pra processar em paralelo.                                     |
+| **Sidecar**            | Processo separado que roda junto com o app principal (no nosso caso, FastAPI dentro do Tauri). |
+| **Few-shot prompting** | Dar exemplos pro LLM antes de pedir pra ele fazer algo.                                        |
+| **Chain-of-thought**   | Forçar o LLM a "pensar passo a passo" antes de responder.                                      |
+| **Alucinação**         | Quando a IA inventa informação que não estava no input.                                        |
+| **Fallback**           | Plano B quando o plano A falha. (Groq cai → AssemblyAI assume)                                 |
+| **Free tier**          | Plano gratuito de uma API.                                                                     |
+| **Rate limit**         | Limite de requisições por tempo.                                                               |
+| **WebView**            | Componente do SO que renderiza HTML (usado pelo Tauri).                                        |
+| **PyInstaller**        | Ferramenta que empacota um app Python em executável.                                           |
+| **WASAPI**             | API de áudio do Windows que permite captura de loopback (áudio do sistema).                    |
+| **ScreenCaptureKit**   | API de captura de tela/áudio do macOS 13+.                                                     |
+| **Content Protection** | Flag que esconde uma janela de softwares de captura de tela.                                   |
 
 ---
 
@@ -240,6 +253,7 @@ npm run tauri build
 ```
 
 Saída do build: `src-tauri/target/release/bundle/`
+
 - Windows: `.msi` e `.exe`
 - macOS: `.dmg` e `.app`
 
