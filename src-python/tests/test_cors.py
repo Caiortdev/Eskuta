@@ -25,9 +25,7 @@ REJECTED_ORIGINS = [
 
 
 @pytest.mark.parametrize("origin", ALLOWED_ORIGINS)
-async def test_cors_allows_known_origins(
-    client: httpx.AsyncClient, origin: str
-) -> None:
+async def test_cors_allows_known_origins(client: httpx.AsyncClient, origin: str) -> None:
     res = await client.options(
         "/health",
         headers={
@@ -40,9 +38,7 @@ async def test_cors_allows_known_origins(
 
 
 @pytest.mark.parametrize("origin", REJECTED_ORIGINS)
-async def test_cors_blocks_unknown_origins(
-    client: httpx.AsyncClient, origin: str
-) -> None:
+async def test_cors_blocks_unknown_origins(client: httpx.AsyncClient, origin: str) -> None:
     res = await client.options(
         "/health",
         headers={
