@@ -1,0 +1,87 @@
+# Eskuta — pre-commit hooks.
+#
+# Instalação (uma vez):
+#   pip install pre-commit
+#   pre-commit install
+#
+# Os hooks rodam automaticamente em cada `git commit`. Para validar
+# manualmente em todo o repo:
+#   pre-commit run --all-files
+
+default_language_version:
+  python: python3.11
+
+repos:
+  # ---------- Hooks gerais ----------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.lock$|package-lock\.json$
+      - id: end-of-file-fixer
+        exclude: \.lock$|package-lock\.json$|\.ico$|\.icns$|\.png$|\.xlsx$
+      - id: check-yaml
+      - id: check-json
+        # tsconfig.json e tsconfig.node.json são JSONC (com comentários);
+        # tauri.conf.json também. Excluímos esses do check JSON estrito.
+        exclude: |
+          (?x)^(
+            tsconfig\.json|
+            tsconfig\.node\.json|
+            src-tauri/tauri\.conf\.json|
+            \.vscode/.*\.json
+          )$
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+        exclude: \.ps1$ # PowerShell scripts ficam em CRLF
+
+  # ---------- Python (sidecar) ----------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: ruff (lint)
+        args: [--fix]
+        files: ^src-python/
+      - id: ruff-format
+        name: ruff (format)
+        files: ^src-python/
+
+  # ---------- Frontend (TS/CSS/MD/JSON) + Rust ----------
+  # Hooks "system" — assumem que npm e cargo estão no PATH (validado pelo
+  # scripts/preflight.ps1). Roda só nos arquivos staged.
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier (format)
+        entry: npx prettier --write --ignore-unknown
+        language: system
+        files: \.(ts|tsx|js|jsx|json|css|md|yml|yaml)$
+        exclude: |
+          (?x)^(
+            src-python/|
+            src-tauri/target/|
+            src-tauri/binaries/|
+            src-tauri/Cargo\.lock|
+            node_modules/|
+            src/components/ui/|
+            package-lock\.json$
+          )
+
+      - id: eslint
+        name: eslint (frontend)
+        entry: npx eslint --max-warnings=0 --no-warn-ignored
+        language: system
+        files: \.(ts|tsx)$
+        exclude: ^src/components/ui/
+
+      - id: cargo-fmt
+        name: cargo fmt (Rust)
+        entry: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+        language: system
+        files: \.rs$
+        pass_filenames: false

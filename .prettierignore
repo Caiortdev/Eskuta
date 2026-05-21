@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+src-tauri/target
+src-tauri/binaries
+src-tauri/gen
+src-python/venv
+src-python/build
+src-python/dist
+src-python/__pycache__
+src-python/.pytest_cache
+src-python/.ruff_cache
+*.lock
+package-lock.json
+Cargo.lock
+src/components/ui
