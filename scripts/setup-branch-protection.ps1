@@ -4,19 +4,19 @@
 
 .DESCRIPTION
     Aplica via `gh api` as regras que garantem que nada entra em main sem:
-      - Todos os jobs do CI verde (status checks obrigatórios)
-      - Pull request aprovado (configurável, ver -RequireReviews)
+      - Todos os jobs do CI verde (status checks obrigatorios)
+      - Pull request aprovado (configuravel, ver -RequireReviews)
       - Conversations resolvidas
       - Sem force-push
       - Sem deletion da branch
 
-    É idempotente — rodar de novo apenas reaplica a mesma config.
+    E idempotente -- rodar de novo apenas reaplica a mesma config.
 
-    Pré-requisito:
-      - `gh` autenticado como usuário com admin no repo
+    Pre-requisito:
+      - `gh` autenticado como usuario com admin no repo
 
 .PARAMETER RequireReviews
-    Número de aprovações de PR exigidas. 0 = solo-friendly (só status
+    Numero de aprovacoes de PR exigidas. 0 = solo-friendly (so status
     checks bloqueiam merge). 1+ = exige review humano. Default: 0.
 
 .PARAMETER Owner
@@ -62,8 +62,8 @@ $prReviews = if ($RequireReviews -gt 0) {
     }
 }
 else {
-    # Solo-friendly: só status checks bloqueiam (sem aprovação humana
-    # obrigatória), mas o owner ainda precisa criar um PR (não pode
+    # Solo-friendly: so status checks bloqueiam (sem aprovacao humana
+    # obrigatoria), mas o owner ainda precisa criar um PR (nao pode
     # pushar direto em main).
     $null
 }
@@ -73,7 +73,7 @@ $payload = @{
         strict   = $true # branch tem que estar up-to-date com main antes do merge
         contexts = $requiredChecks
     }
-    enforce_admins                   = $false # owner pode bypassar em emergência
+    enforce_admins                   = $false # owner pode bypassar em emergencia
     required_pull_request_reviews    = $prReviews
     restrictions                     = $null
     allow_force_pushes               = $false
@@ -84,22 +84,27 @@ $payload = @{
 }
 
 $payloadJson = $payload | ConvertTo-Json -Depth 10 -Compress
+# Escreve sem BOM -- gh CLI rejeita JSON com BOM (HTTP 400).
 $payloadFile = New-TemporaryFile
-$payloadJson | Out-File -FilePath $payloadFile -Encoding utf8
+[System.IO.File]::WriteAllText(
+    $payloadFile.FullName,
+    $payloadJson,
+    [System.Text.UTF8Encoding]::new($false)
+)
 
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  Aplicando branch protection em $Owner/$Repo `:$Branch" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Status checks obrigatórios:" -ForegroundColor Yellow
-$requiredChecks | ForEach-Object { Write-Host "  • $_" }
+Write-Host "Status checks obrigatorios:" -ForegroundColor Yellow
+$requiredChecks | ForEach-Object { Write-Host "  * $_" }
 Write-Host ""
 if ($RequireReviews -gt 0) {
-    Write-Host "Reviews obrigatórias: $RequireReviews (dismiss stale on push)" -ForegroundColor Yellow
+    Write-Host "Reviews obrigatorias: $RequireReviews (dismiss stale on push)" -ForegroundColor Yellow
 }
 else {
-    Write-Host "Reviews obrigatórias: 0 (solo-friendly — só status checks bloqueiam)" -ForegroundColor Yellow
+    Write-Host "Reviews obrigatorias: 0 (solo-friendly -- so status checks bloqueiam)" -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -112,8 +117,8 @@ gh api `
 Remove-Item $payloadFile -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
-Write-Host "✓ Branch protection aplicada." -ForegroundColor Green
+Write-Host "OK -- Branch protection aplicada." -ForegroundColor Green
 Write-Host ""
-Write-Host "Pra aumentar segurança no futuro:" -ForegroundColor Yellow
+Write-Host "Pra aumentar seguranca no futuro:" -ForegroundColor Yellow
 Write-Host "  pwsh scripts/setup-branch-protection.ps1 -RequireReviews 1"
 Write-Host ""
