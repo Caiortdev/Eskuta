@@ -35,6 +35,7 @@ src-python/__pycache__/
 src-python/**/__pycache__/
 src-python/*.egg-info/
 src-python/.pytest_cache/
+src-python/.pytest-tmp/
 src-python/.mypy_cache/
 src-python/.ruff_cache/
 src-python/dist/

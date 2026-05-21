@@ -3,10 +3,14 @@ minversion = "8.0"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+# basetemp local — evita conflitos de permissão em %TEMP%\pytest-of-* no
+# Windows (handles de processos anteriores podem ficar com acesso negado).
+# O diretório está no .gitignore da raiz.
 addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
+    "--basetemp=.pytest-tmp",
     "--cov=app",
     "--cov-report=term-missing",
     "--cov-fail-under=70",

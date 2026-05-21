@@ -20,7 +20,9 @@ async def test_health_returns_200(client: httpx.AsyncClient) -> None:
 async def test_health_payload_shape(client: httpx.AsyncClient) -> None:
     res = await client.get("/health")
     body = res.json()
-    assert body == {"status": "ok", "version": __version__}
+    assert body["status"] == "ok"
+    assert body["version"] == __version__
+    assert "environment" in body
 
 
 async def test_health_content_type_is_json(client: httpx.AsyncClient) -> None:
