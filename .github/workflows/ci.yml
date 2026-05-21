@@ -1,8 +1,12 @@
 name: CI
 
 on:
+  # CI roda em todo PR aberto pra main + smoke test pós-merge em main.
+  # Branches feature/chore/fix NÃO disparam o workflow direto — pra ver
+  # CI nelas, basta abrir o PR (mesmo draft). Isso evita rodar 2x o
+  # mesmo CI quando um push aciona simultaneamente `push` + `pull_request`.
   push:
-    branches: [main, "phase-**", "chore/**", "feat/**", "fix/**"]
+    branches: [main]
   pull_request:
     branches: [main]
 
