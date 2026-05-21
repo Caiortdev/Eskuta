@@ -21,6 +21,7 @@ export default defineConfig({
       exclude: [
         "src/main.tsx",
         "src/vite-env.d.ts",
+        "src/vitest.d.ts",
         "src/components/ui/**", // Shadcn components (cópia do upstream)
         "src/**/*.test.{ts,tsx}",
       ],
