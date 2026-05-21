@@ -136,6 +136,17 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # O build.rs do Tauri lê tauri.conf.json e exige que cada
+      # externalBin exista pro target atual. Como o sidecar real só
+      # é empacotado no job tauri-build (Windows), criamos um stub
+      # vazio aqui pra clippy poder rodar (clippy só faz análise
+      # estática, não executa o binário).
+      - name: Stub sidecar binary (apenas pra clippy aceitar)
+        run: |
+          mkdir -p src-tauri/binaries
+          touch src-tauri/binaries/eskuta-sidecar-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/eskuta-sidecar-x86_64-unknown-linux-gnu
+
       - name: cargo fmt --check
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
