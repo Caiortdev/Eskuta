@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from app.api.keys import router as keys_router
 from app.core.logging import setup_logging
 from app.core.settings import settings
 
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
             "environment": settings.ENVIRONMENT,
         }
 
+    app.include_router(keys_router)
     return app
 
 

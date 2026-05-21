@@ -27,3 +27,7 @@ alembic==1.13.3
 
 # --- Observabilidade ---
 loguru==0.7.2
+
+# --- Armazenamento seguro de API keys (Etapa 1.11) ---
+# Delega pro OS keyring nativo (Credential Manager / Keychain / Secret Service).
+keyring==25.4.1
