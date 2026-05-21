@@ -38,6 +38,7 @@ src-python/.pytest_cache/
 src-python/.pytest-tmp/
 src-python/.mypy_cache/
 src-python/.ruff_cache/
+src-python/.tmp-db-test/
 src-python/dist/
 src-python/build/
 src-python/*.spec
