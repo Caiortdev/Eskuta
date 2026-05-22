@@ -3,29 +3,31 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const apiMocks = vi.hoisted(() => ({
-  get: vi.fn(),
-}));
-
-class ApiErrorMock extends Error {
-  status: number;
-  body: unknown;
-  detail: string | null;
-  constructor(status: number, body: unknown, message?: string) {
-    super(message ?? `Sidecar respondeu ${status}`);
-    this.name = "ApiError";
-    this.status = status;
-    this.body = body;
-    this.detail =
-      body && typeof body === "object" && "detail" in body
-        ? (body as { detail: string }).detail
-        : null;
+const apiMocks = vi.hoisted(() => {
+  class ApiErrorMock extends Error {
+    status: number;
+    body: unknown;
+    detail: string | null;
+    constructor(status: number, body: unknown, message?: string) {
+      super(message ?? `Sidecar respondeu ${status}`);
+      this.name = "ApiError";
+      this.status = status;
+      this.body = body;
+      this.detail =
+        body && typeof body === "object" && "detail" in body
+          ? (body as { detail: string }).detail
+          : null;
+    }
   }
-}
+  return {
+    get: vi.fn(),
+    ApiError: ApiErrorMock,
+  };
+});
 
 vi.mock("@/lib/api", () => ({
   api: { meetings: { get: apiMocks.get } },
-  ApiError: ApiErrorMock,
+  ApiError: apiMocks.ApiError,
 }));
 
 import { MeetingDetailPage } from "./MeetingDetail";

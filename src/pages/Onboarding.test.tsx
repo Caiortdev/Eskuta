@@ -26,8 +26,8 @@ describe("OnboardingPage", () => {
 
   it("explica STT e LLM", () => {
     renderPage();
-    expect(screen.getByText(/STT/)).toBeInTheDocument();
-    expect(screen.getByText(/LLM/)).toBeInTheDocument();
+    expect(screen.getAllByText(/STT/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/LLM/).length).toBeGreaterThan(0);
   });
 
   it("menciona keyring do sistema", () => {
