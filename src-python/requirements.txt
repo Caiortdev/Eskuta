@@ -57,3 +57,8 @@ pyannote.audio==4.0.4
 anthropic==0.104.0
 openai==2.38.0
 google-genai==2.5.0
+
+# --- Geração de ata anti-alucinação (Etapa 1.7) ---
+# rapidfuzz: validação fuzzy de citações (quote vs transcrição). Versão
+# 3.14.5 (não 3.10.0 do relatório) — patch upgrade compat.
+rapidfuzz==3.14.5
