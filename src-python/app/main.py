@@ -181,6 +181,22 @@ def create_app() -> FastAPI:
     app.include_router(transcription_router)
     app.include_router(diagnostics_router)
 
+    # Migrations: roda `alembic upgrade head` no startup. CRÍTICO em
+    # produção (PyInstaller bundle) — sem isso, DB fica sem tabelas e
+    # qualquer query falha com "no such table".
+    @app.on_event("startup")
+    async def _run_migrations() -> None:
+        try:
+            from app.db.migrations import run_migrations_upgrade_head
+
+            settings.ensure_dirs()
+            run_migrations_upgrade_head()
+        except Exception as exc:
+            logger.exception("Falha rodando migrations no startup: {err}", err=exc)
+            # Não interrompe o boot — algumas rotas podem funcionar sem DB
+            # (ex: /health, /api/keys que usa keyring), e usuário pode
+            # exportar logs pra diagnóstico
+
     # Pre-warm: triggera import dos SDKs lazy no startup (não chama a API,
     # só importa o módulo Python). Primeira request fica ~200-500ms mais
     # rápida por não pagar o import.

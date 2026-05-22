@@ -55,7 +55,10 @@ HIDDEN_IMPORTS = [
     "keyring.backends.SecretService",
     "keyring.backends.kwallet",
     "keyring.backends.fail",
-    # SQLAlchemy + aiosqlite
+    # SQLAlchemy + aiosqlite (package separado precisa ser explícito)
+    "aiosqlite",
+    "aiosqlite.core",
+    "aiosqlite.cursor",
     "sqlalchemy.dialects.sqlite.aiosqlite",
     "sqlalchemy.dialects.sqlite.pysqlite",
     # Alembic — carrega env.py + revisions dinamicamente
@@ -78,6 +81,27 @@ HIDDEN_IMPORTS = [
 ]
 
 
+# Módulos pesados (>1GB no bundle) — excluídos do MVP. O app já tem
+# fallback gracioso em is_available() quando esses módulos não carregam.
+# Diarização (pyannote/torch/torchaudio) volta na v0.2 quando otimizarmos.
+EXCLUDE_MODULES = [
+    "torch",
+    "torchaudio",
+    "torchvision",
+    "pyannote",
+    "pyannote.audio",
+    "pyannote.core",
+    "pyannote.metrics",
+    "pyannote.pipeline",
+    "tensorflow",
+    "tensorboard",
+    "matplotlib",
+    "pytest",
+    "evaluation",  # módulo de benchmarks — não precisa em runtime
+    # Nota: scipy / pandas / PIL ficam — librosa depende deles em runtime
+]
+
+
 def main() -> None:
     if not APP_ENTRY.exists():
         sys.exit(f"app/main.py não encontrado em {APP_ENTRY}")
@@ -85,11 +109,19 @@ def main() -> None:
     args = [
         str(APP_ENTRY),
         "--name",
-        TARGET_NAME_FILE,
-        "--onefile",
+        TARGET_NAME,  # sem .exe — PyInstaller adiciona em --onedir
+        # --onedir gera dist/eskuta-sidecar/ com .exe + libs ao lado. Start
+        # ~3x mais rápido que --onefile (sem extrair 200MB em temp toda vez).
+        # Defender também confia mais (não usa o padrão suspeito de
+        # auto-extração).
+        "--onedir",
         "--clean",
         "--noconfirm",
-        "--console",  # Sidecar é um servidor HTTP — precisa de stdout/stderr pra logs
+        # --windowed: subsystem GUI (sem console window). Sidecar ainda
+        # tem stdout/stderr (Tauri captura via Stdio::piped), mas nenhuma
+        # janela CMD aparece quando o usuário abre o app. Logs persistentes
+        # vão pro loguru file (~/.eskuta/logs/) — não dependemos do stdout.
+        "--windowed",
         "--distpath",
         str(ROOT / "dist"),
         "--workpath",
@@ -98,9 +130,74 @@ def main() -> None:
         str(ROOT / "build"),
     ]
 
+    # Version info do exe — faz com que o Defender/SmartScreen confie mais.
+    # Antivírus desconfia de executáveis SEM company name, version, etc.
+    version_file = ROOT / "build" / "version_info.txt"
+    version_file.parent.mkdir(parents=True, exist_ok=True)
+    version_file.write_text(
+        """# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(0, 1, 0, 0),
+    prodvers=(0, 1, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable('040904B0', [
+        StringStruct('CompanyName', 'Eskuta'),
+        StringStruct('FileDescription', 'Eskuta Sidecar - servidor local de transcricao'),
+        StringStruct('FileVersion', '0.1.0'),
+        StringStruct('InternalName', 'eskuta-sidecar'),
+        StringStruct('LegalCopyright', 'MIT License'),
+        StringStruct('OriginalFilename', 'eskuta-sidecar.exe'),
+        StringStruct('ProductName', 'Eskuta'),
+        StringStruct('ProductVersion', '0.1.0'),
+      ])
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+""",
+        encoding="utf-8",
+    )
+    if platform.system() == "Windows":
+        args.extend(["--version-file", str(version_file)])
+
     # Hidden imports
     for mod in HIDDEN_IMPORTS:
         args.extend(["--hidden-import", mod])
+
+    # --collect-all pega TODOS os submódulos + data files dos packages
+    # críticos. Mais robusto que listar submódulos manualmente. Use
+    # apenas pra packages que sabemos que precisam de coleta agressiva
+    # (databases async, SDKs com plugins, alembic).
+    COLLECT_ALL = [
+        "aiosqlite",
+        "sqlalchemy",
+        "alembic",
+        "keyring",
+        "uvicorn",
+        "fastapi",
+        "starlette",
+        "pydantic",
+        "pydantic_settings",
+        "loguru",
+    ]
+    for mod in COLLECT_ALL:
+        args.extend(["--collect-all", mod])
+
+    # Exclusões — reduz tamanho do bundle drasticamente (de ~2GB pra ~200MB)
+    # ao tirar torch + pyannote + libs científicas pesadas que não usamos
+    # em runtime do MVP. Diarização opcional já tem fallback em
+    # is_available() do app.services.diarization.
+    for mod in EXCLUDE_MODULES:
+        args.extend(["--exclude-module", mod])
 
     # Recursos: alembic.ini + pasta de migrations precisam ser empacotados
     # como data files (o sidecar roda alembic upgrade na inicialização).
@@ -114,14 +211,18 @@ def main() -> None:
 
     PyInstaller.__main__.run(args)
 
-    # Sanity: confirma que o binário existe
-    output = ROOT / "dist" / TARGET_NAME_FILE
-    if not output.exists():
-        sys.exit(f"[ERROR] Build falhou: {output} nao foi gerado")
+    # Sanity: confirma que o binário existe. Em --onedir, PyInstaller gera
+    # dist/<name>/<name>.exe (pasta com .exe + _internal/), não dist/<name>.exe.
+    output_dir = ROOT / "dist" / TARGET_NAME
+    output_exe = output_dir / TARGET_NAME_FILE
+    if not output_exe.exists():
+        sys.exit(f"[ERROR] Build falhou: {output_exe} nao foi gerado")
 
-    size_mb = output.stat().st_size / (1024 * 1024)
-    print(f"\n[OK] Sidecar empacotado: {output}")
-    print(f"     Tamanho: {size_mb:.1f} MB")
+    # Tamanho da pasta inteira (--onedir empacota .exe + libs no _internal/)
+    total_bytes = sum(f.stat().st_size for f in output_dir.rglob("*") if f.is_file())
+    size_mb = total_bytes / (1024 * 1024)
+    print(f"\n[OK] Sidecar empacotado em: {output_dir}")
+    print(f"     Tamanho total: {size_mb:.1f} MB")
 
 
 def cleanup_build_artifacts() -> None:
