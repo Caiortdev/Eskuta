@@ -1,12 +1,10 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+/**
+ * Testes do gate de sidecar do App.tsx — os tests das páginas
+ * individuais ficam em src/pages/__tests__/* (não escopo aqui).
+ */
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi
-    .fn()
-    .mockResolvedValue("Hello, Eskuta! You've been greeted from Rust!"),
-}));
+import { render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock controlado do api.ts — vi.mock() é hoisted, por isso usamos
 // hoisted state via vi.hoisted() pra referenciar o mock nas asserções.
@@ -30,94 +28,62 @@ const apiMocks = vi.hoisted(() => {
 vi.mock("@/lib/api", () => ({
   ApiError: apiMocks.ApiError,
   waitForSidecar: apiMocks.waitForSidecar,
+  api: {
+    meetings: { list: vi.fn().mockResolvedValue({ meetings: [], total: 0 }) },
+    keys: { list: vi.fn().mockResolvedValue({ providers: [] }) },
+  },
 }));
 
 import App from "./App";
-import { invoke } from "@tauri-apps/api/core";
 
 const { waitForSidecar: waitForSidecarMock, ApiError: ApiErrorMock } = apiMocks;
 
 beforeEach(() => {
   waitForSidecarMock.mockReset();
-  vi.mocked(invoke).mockClear();
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-describe("App — render base", () => {
-  it("renderiza título Eskuta", () => {
-    waitForSidecarMock.mockReturnValue(new Promise(() => {})); // never resolves
-    render(<App />);
-    expect(
-      screen.getByRole("heading", { name: /eskuta/i, level: 1 }),
-    ).toBeInTheDocument();
-  });
-});
-
-describe("App — estados do sidecar", () => {
+describe("App — gate de sidecar", () => {
   it("mostra 'Aguardando sidecar' enquanto health não responde", () => {
-    waitForSidecarMock.mockReturnValue(new Promise(() => {}));
+    waitForSidecarMock.mockReturnValue(new Promise(() => {})); // never resolves
     render(<App />);
     expect(screen.getByText(/aguardando sidecar/i)).toBeInTheDocument();
   });
 
-  it("mostra 'Sidecar OK · v{version}' quando waitForSidecar resolve", async () => {
-    waitForSidecarMock.mockResolvedValue({ status: "ok", version: "0.1.0" });
-    render(<App />);
-    await waitFor(() => {
-      expect(screen.getByText(/sidecar ok/i)).toBeInTheDocument();
-    });
-    expect(screen.getByText(/v0\.1\.0/)).toBeInTheDocument();
-  });
-
-  it("mostra badge de falha com mensagem quando waitForSidecar rejeita com Error", async () => {
+  it("mostra mensagem de erro quando waitForSidecar rejeita com Error", async () => {
     waitForSidecarMock.mockRejectedValue(new Error("connection refused"));
     render(<App />);
     await waitFor(() => {
-      expect(screen.getByText(/sidecar falhou/i)).toBeInTheDocument();
+      expect(screen.getByText(/sidecar não respondeu/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/connection refused/i)).toBeInTheDocument();
   });
 
-  it("mostra badge de falha com status quando waitForSidecar rejeita com ApiError", async () => {
+  it("mostra status code quando waitForSidecar rejeita com ApiError", async () => {
     waitForSidecarMock.mockRejectedValue(
       new ApiErrorMock(503, { detail: "down" }),
     );
     render(<App />);
     await waitFor(() => {
-      expect(screen.getByText(/sidecar falhou/i)).toBeInTheDocument();
+      expect(screen.getByText(/sidecar não respondeu/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/503/)).toBeInTheDocument();
   });
 
-  it("mostra mensagem genérica quando waitForSidecar rejeita com valor não-Error", async () => {
-    waitForSidecarMock.mockRejectedValue("kaboom");
+  it("renderiza app principal (sidebar 'Reuniões') quando sidecar fica pronto", async () => {
+    waitForSidecarMock.mockResolvedValue({ status: "ok", version: "0.1.0" });
     render(<App />);
     await waitFor(() => {
-      expect(screen.getByText(/sidecar falhou/i)).toBeInTheDocument();
+      // Sidebar do AppLayout tem link "Reuniões"
+      expect(screen.getAllByText(/reuniões/i).length).toBeGreaterThan(0);
     });
-    expect(screen.getByText(/kaboom/)).toBeInTheDocument();
   });
-});
 
-describe("App — interação greet", () => {
-  it("invoca o comando Rust 'greet' ao submeter o form", async () => {
-    waitForSidecarMock.mockResolvedValue({ status: "ok", version: "0.1.0" });
-    const user = userEvent.setup();
+  it("botão 'Tentar de novo' aparece em estado de falha", async () => {
+    waitForSidecarMock.mockRejectedValue(new Error("boom"));
     render(<App />);
-
-    const input = screen.getByPlaceholderText(/diga seu nome/i);
-    await user.type(input, "Caio");
-    await act(async () => {
-      await user.click(screen.getByRole("button", { name: /saudar/i }));
-    });
-
-    expect(invoke).toHaveBeenCalledWith("greet", { name: "Caio" });
     await waitFor(() => {
       expect(
-        screen.getByText(/hello, eskuta! you've been greeted from rust/i),
+        screen.getByRole("button", { name: /tentar de novo/i }),
       ).toBeInTheDocument();
     });
   });

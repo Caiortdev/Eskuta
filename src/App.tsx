@@ -1,8 +1,25 @@
+/**
+ * Root da SPA. Faz duas coisas:
+ *
+ * 1. Espera o sidecar Python subir (waitForSidecar) — bloqueia toda a UI
+ *    até /health responder. Sem isso, qualquer chamada quebra.
+ * 2. Monta o React Router com layout principal + rotas.
+ *
+ * Onboarding fica fora do AppLayout (sem sidebar) — é o gate inicial.
+ */
+
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
+import { ApiError, type HealthResponse, waitForSidecar } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { ApiError, waitForSidecar, type HealthResponse } from "@/lib/api";
+import { HomePage } from "@/pages/Home";
+import { MeetingDetailPage } from "@/pages/MeetingDetail";
+import { OnboardingPage } from "@/pages/Onboarding";
+import { ProcessingPage } from "@/pages/Processing";
+import { SettingsPage } from "@/pages/Settings";
+import { UploadPage } from "@/pages/Upload";
 
 type SidecarStatus =
   | { kind: "starting" }
@@ -10,8 +27,6 @@ type SidecarStatus =
   | { kind: "failed"; error: string };
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
   const [sidecar, setSidecar] = useState<SidecarStatus>({ kind: "starting" });
 
   useEffect(() => {
@@ -30,81 +45,70 @@ function App() {
     return () => abort.abort();
   }, []);
 
-  async function greet() {
-    setGreetMsg(await invoke("greet", { name }));
+  if (sidecar.kind !== "ready") {
+    return <SidecarGate status={sidecar} />;
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
-      <div className="w-full max-w-xl space-y-6 rounded-2xl border bg-card text-card-foreground p-8 shadow-sm">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">Eskuta</h1>
-          <p className="text-sm text-muted-foreground">
-            App desktop de transcrição e geração de atas de reunião — Fase 0
-            (setup).
-          </p>
-        </header>
-
-        <SidecarBadge status={sidecar} />
-
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            greet();
-          }}
-        >
-          <input
-            value={name}
-            onChange={(e) => setName(e.currentTarget.value)}
-            placeholder="Diga seu nome…"
-            className={cn(
-              "flex-1 rounded-md border bg-transparent px-3 py-2 text-sm",
-              "placeholder:text-muted-foreground",
-              "focus:outline-none focus:ring-2 focus:ring-ring",
-            )}
-          />
-          <Button type="submit">Saudar</Button>
-        </form>
-
-        {greetMsg && (
-          <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            {greetMsg}
-          </p>
-        )}
-      </div>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route element={<AppLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="/upload" element={<UploadPage />} />
+          <Route path="/processing/:id" element={<ProcessingPage />} />
+          <Route path="/meetings/:id" element={<MeetingDetailPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
-function SidecarBadge({ status }: { status: SidecarStatus }) {
+function SidecarGate({
+  status,
+}: {
+  status: { kind: "starting" } | { kind: "failed"; error: string };
+}) {
   const base =
-    "rounded-md px-3 py-2 text-xs font-medium flex items-center gap-2";
+    "min-h-screen flex items-center justify-center p-6 bg-background";
   if (status.kind === "starting") {
     return (
-      <div className={cn(base, "bg-muted text-muted-foreground")}>
-        <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
-        Aguardando sidecar Python subir…
-      </div>
-    );
-  }
-  if (status.kind === "failed") {
-    return (
-      <div
-        className={cn(
-          base,
-          "bg-destructive/10 text-destructive border border-destructive/20",
-        )}
-      >
-        <span className="size-2 rounded-full bg-destructive" />
-        Sidecar falhou: {status.error}
+      <div className={base}>
+        <div className="text-center space-y-3">
+          <div className="size-3 mx-auto rounded-full bg-amber-500 animate-pulse" />
+          <p className="text-sm text-muted-foreground">
+            Aguardando sidecar Python subir…
+          </p>
+        </div>
       </div>
     );
   }
   return (
-    <div className={cn(base, "bg-emerald-500/10 text-emerald-700")}>
-      <span className="size-2 rounded-full bg-emerald-500" />
-      Sidecar OK · v{status.health.version}
+    <div className={base}>
+      <div
+        className={cn(
+          "max-w-md rounded-md border border-destructive/30 bg-destructive/5",
+          "p-6 text-center",
+        )}
+      >
+        <h2 className="text-lg font-semibold text-destructive">
+          Sidecar não respondeu
+        </h2>
+        <p className="mt-2 text-sm text-destructive/80">{status.error}</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Verifique os logs em ~/.eskuta/logs/ ou reinicie o app.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-4"
+          onClick={() => window.location.reload()}
+        >
+          Tentar de novo
+        </Button>
+      </div>
     </div>
   );
 }
