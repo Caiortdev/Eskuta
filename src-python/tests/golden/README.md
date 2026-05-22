@@ -59,9 +59,9 @@ Array JSON com `{start_sec, end_sec, speaker_id}`:
 
 ```json
 [
-  {"start_sec": 0.0, "end_sec": 5.2, "speaker_id": "JOAO"},
-  {"start_sec": 5.5, "end_sec": 12.1, "speaker_id": "MARIA"},
-  {"start_sec": 12.3, "end_sec": 18.7, "speaker_id": "JOAO"}
+  { "start_sec": 0.0, "end_sec": 5.2, "speaker_id": "JOAO" },
+  { "start_sec": 5.5, "end_sec": 12.1, "speaker_id": "MARIA" },
+  { "start_sec": 12.3, "end_sec": 18.7, "speaker_id": "JOAO" }
 ]
 ```
 
