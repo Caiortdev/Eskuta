@@ -273,20 +273,26 @@ jobs:
         working-directory: src-python
         run: python build_sidecar.py
 
-      - name: Stage sidecar for Tauri
+      - name: Stage sidecar for Tauri (--onedir folder)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force src-tauri/binaries | Out-Null
-          Copy-Item src-python/dist/eskuta-sidecar.exe `
-                    src-tauri/binaries/eskuta-sidecar-x86_64-pc-windows-msvc.exe
+          # Com PyInstaller --onedir, src-python/dist/eskuta-sidecar/
+          # é uma PASTA com .exe + _internal/. Copia inteira pra
+          # src-tauri/binaries/eskuta-sidecar/ (Tauri pega via
+          # bundle.resources do tauri.conf.json).
+          $src = "src-python/dist/eskuta-sidecar"
+          $dst = "src-tauri/binaries/eskuta-sidecar"
+          if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          Copy-Item -Path "$src/*" -Destination $dst -Recurse -Force
 
       - name: Smoke test sidecar empacotado
         shell: pwsh
         run: |
           # Sobe o sidecar empacotado e bate em /health pra validar
-          # que o bundle PyInstaller realmente roda em máquina limpa
-          # (sem o venv Python). Mata o processo em 30s.
-          $sidecar = Start-Process -FilePath "src-python\dist\eskuta-sidecar.exe" `
+          # que o bundle PyInstaller realmente roda em máquina limpa.
+          # Path da pasta --onedir: src-python/dist/eskuta-sidecar/eskuta-sidecar.exe
+          $sidecar = Start-Process -FilePath "src-python\dist\eskuta-sidecar\eskuta-sidecar.exe" `
                                    -ArgumentList "--host", "127.0.0.1", "--port", "8766" `
                                    -PassThru -WindowStyle Hidden
           try {
