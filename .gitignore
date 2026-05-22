@@ -59,6 +59,13 @@ secrets.json
 .eskuta/
 .atena/
 
+# --- Documentação ---
+# Por default ignoramos docs/ pra não commitar rascunhos / drafts
+# acidentalmente. Specs públicas já-tracked (MAPA_PROJETO, RELATORIO_TECNICO,
+# AUDIT-FASE-*.md, etc) continuam versionadas. Pra adicionar UM doc novo
+# que queremos versionar, usar `git add -f docs/<arquivo>`.
+docs/
+
 # --- Coverage / Testes ---
 coverage/
 .coverage

@@ -12,12 +12,21 @@ addopts = [
     "--strict-config",
     "--basetemp=.pytest-tmp",
     "--cov=app",
+    "--cov=evaluation",
     "--cov-report=term-missing",
     "--cov-fail-under=70",
+    # Benchmarks (Fase 1.9.5 / Bloco A.4) ficam DESABILITADOS por default
+    # — eles só fazem sentido com --benchmark-only e medir cobertura
+    # neles distorce o cov gate. Pra rodar:
+    #   pytest tests/benchmarks/ --benchmark-only
+    "--benchmark-disable",
+    # Excluímos tests/benchmarks/ do coverage gate também — são apenas
+    # micro-benchmarks de funções já cobertas por outros tests.
+    "--ignore=tests/benchmarks",
 ]
 
 [tool.coverage.run]
-source = ["app"]
+source = ["app", "evaluation"]
 branch = true
 
 [tool.coverage.report]

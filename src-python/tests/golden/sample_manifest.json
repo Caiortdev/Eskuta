@@ -1,0 +1,5 @@
+{
+  "name": "Sample manifest — sem goldens reais ainda",
+  "description": "Template inicial. Substituir por goldens reais conforme docs/MELHORIAS-CONCORRENTE.md A.2.",
+  "goldens": []
+}
