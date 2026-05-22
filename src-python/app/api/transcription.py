@@ -1,19 +1,18 @@
 """
-Endpoints REST de transcrição.
+Endpoints REST de transcrição / orquestração de meeting.
 
-Conforme RELATORIO_TECNICO §1.4.2, expomos um `POST /transcribe/start`
-que dispara `process_meeting` em background. A função `process_meeting`
-é um **stub** nesta fase — a orquestração completa (load meeting → load
-audio → preprocess → chunk → transcribe paralelo → persist) é território
-da Fase 1.9 (Pipeline de Geração da Ata). Aqui só validamos o contrato
-do endpoint e o agendamento em BackgroundTasks.
+`POST /transcribe/start` dispara o pipeline completo da Fase 1.9
+(`process_meeting`) em background. Retorna imediatamente com status
+`processing`; UI polla `/meetings/{id}/status` (a ser implementado
+na Fase 1.10) pra mostrar progresso por estágio.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks
-from loguru import logger
 from pydantic import BaseModel, Field
+
+from app.services.minutes.pipeline import process_meeting
 
 router = APIRouter(prefix="/transcribe", tags=["transcribe"])
 
@@ -27,27 +26,17 @@ class StartTranscriptionResponse(BaseModel):
     meeting_id: str
 
 
-async def process_meeting(meeting_id: str) -> None:
-    """
-    STUB — implementação completa virá na Fase 1.9.
-
-    A versão final vai: carregar a meeting do DB, recuperar/preprocessar
-    o áudio, VAD + chunking, transcrever em paralelo via TranscriptionRouter
-    e persistir `Transcript` + `TranscriptSegment` no DB. Nesta fase apenas
-    registramos a chamada — não há side effects.
-    """
-    logger.warning(
-        "process_meeting (STUB) chamado",
-        meeting_id=meeting_id,
-        note="Orquestração completa será implementada na Fase 1.9",
-    )
-
-
 @router.post("/start", response_model=StartTranscriptionResponse)
 async def start_transcription(
     body: StartTranscriptionRequest,
     background: BackgroundTasks,
 ) -> StartTranscriptionResponse:
-    """Dispara transcrição assíncrona de uma reunião identificada por ID."""
+    """
+    Dispara o pipeline assíncrono de processamento da reunião.
+
+    A reunião precisa já existir no DB (criada por upload — vai entrar
+    em Fase 1.10). Esta rota só agenda — o pipeline real (`process_meeting`)
+    roda em background e atualiza `meeting.status` em cada estágio.
+    """
     background.add_task(process_meeting, body.meeting_id)
     return StartTranscriptionResponse(status="processing", meeting_id=body.meeting_id)
