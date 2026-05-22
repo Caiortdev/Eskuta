@@ -23,6 +23,7 @@ export default defineConfig({
         "src/vite-env.d.ts",
         "src/vitest.d.ts",
         "src/components/ui/**", // Shadcn components (cópia do upstream)
+        "src/types/**", // Pure type declarations (no runtime code)
         "src/**/*.test.{ts,tsx}",
       ],
       reporter: ["text", "html"],
