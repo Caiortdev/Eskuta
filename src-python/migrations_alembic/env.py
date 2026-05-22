@@ -38,7 +38,10 @@ from app.models import (  # noqa: F401 — registra models em Base.metadata
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: o setup_logging do app já configurou
+    # os loggers (com InterceptHandler pra loguru). Default True deletaria
+    # esses handlers e quebra o roteamento stdlib → loguru.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Override do DSN com o caminho do settings (não hardcoded em alembic.ini).
 # Usamos engine SYNC aqui (sqlite:///) em vez de async (sqlite+aiosqlite:///)

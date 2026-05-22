@@ -85,7 +85,7 @@ async def test_upload_creates_meeting_and_dispatches_pipeline(
         new=AsyncMock(return_value=None),
     ) as mock_pipeline:
         res = await client.post(
-            "/meetings/upload",
+            "/api/meetings/upload",
             files={"file": ("reunião.mp3", io.BytesIO(audio_bytes), "audio/mpeg")},
         )
 
@@ -115,7 +115,7 @@ async def test_upload_rejects_unsupported_extension(
 ) -> None:
     client, _ = client_with_db
     res = await client.post(
-        "/meetings/upload",
+        "/api/meetings/upload",
         files={"file": ("doc.pdf", io.BytesIO(b"x" * 100), "application/pdf")},
     )
     assert res.status_code == 422
@@ -128,7 +128,7 @@ async def test_upload_rejects_no_extension(
 ) -> None:
     client, _ = client_with_db
     res = await client.post(
-        "/meetings/upload",
+        "/api/meetings/upload",
         files={"file": ("noext", io.BytesIO(b"x" * 100), "audio/mpeg")},
     )
     assert res.status_code == 422
@@ -146,7 +146,7 @@ async def test_upload_enforces_size_limit(
     too_big = b"x" * (2 * 1024 * 1024)  # 2MB
     with patch("app.api.meetings.process_meeting", new=AsyncMock()):
         res = await client.post(
-            "/meetings/upload",
+            "/api/meetings/upload",
             files={"file": ("big.mp3", io.BytesIO(too_big), "audio/mpeg")},
         )
     assert res.status_code == 413
@@ -161,7 +161,7 @@ async def test_upload_accepts_all_whitelisted_extensions(
     with patch("app.api.meetings.process_meeting", new=AsyncMock()):
         for ext in ALLOWED_EXTENSIONS:
             res = await client.post(
-                "/meetings/upload",
+                "/api/meetings/upload",
                 files={"file": (f"r{ext}", io.BytesIO(b"abc"), "audio/x-test")},
             )
             assert res.status_code == 201, f"{ext} deveria ter sido aceito"
@@ -174,7 +174,7 @@ async def test_upload_with_title_param(
     client, session = client_with_db
     with patch("app.api.meetings.process_meeting", new=AsyncMock()):
         res = await client.post(
-            "/meetings/upload?title=Sprint%20Planning",
+            "/api/meetings/upload?title=Sprint%20Planning",
             files={"file": ("a.mp3", io.BytesIO(b"x"), "audio/mpeg")},
         )
     body = res.json()
@@ -191,7 +191,7 @@ async def test_upload_sanitizes_dangerous_filename(
     client, session = client_with_db
     with patch("app.api.meetings.process_meeting", new=AsyncMock()):
         res = await client.post(
-            "/meetings/upload",
+            "/api/meetings/upload",
             files={
                 "file": (
                     "../../etc/passwd.mp3",
@@ -218,7 +218,7 @@ async def test_list_returns_empty_when_no_meetings(
     client_with_db,
 ) -> None:
     client, _ = client_with_db
-    res = await client.get("/meetings")
+    res = await client.get("/api/meetings")
     assert res.status_code == 200
     assert res.json() == {"meetings": [], "total": 0, "limit": 50, "offset": 0}
 
@@ -229,7 +229,7 @@ async def test_list_orders_by_created_at_desc(
     client, session = client_with_db
     m1 = await _create_meeting(session, title="primeira")
     m2 = await _create_meeting(session, title="segunda")
-    res = await client.get("/meetings")
+    res = await client.get("/api/meetings")
     body = res.json()
     assert body["total"] == 2
     # Mais recente primeiro
@@ -243,7 +243,7 @@ async def test_list_excludes_soft_deleted(
     client, session = client_with_db
     m_alive = await _create_meeting(session, title="ativa")
     await _create_meeting(session, title="apagada", soft_deleted=True)
-    res = await client.get("/meetings")
+    res = await client.get("/api/meetings")
     body = res.json()
     assert body["total"] == 1
     assert body["meetings"][0]["id"] == m_alive.id
@@ -253,22 +253,22 @@ async def test_list_pagination(client_with_db) -> None:
     client, session = client_with_db
     for i in range(5):
         await _create_meeting(session, title=f"m{i}")
-    res = await client.get("/meetings?limit=2&offset=0")
+    res = await client.get("/api/meetings?limit=2&offset=0")
     body = res.json()
     assert body["total"] == 5
     assert body["limit"] == 2
     assert body["offset"] == 0
     assert len(body["meetings"]) == 2
 
-    res2 = await client.get("/meetings?limit=2&offset=2")
+    res2 = await client.get("/api/meetings?limit=2&offset=2")
     assert len(res2.json()["meetings"]) == 2
 
 
 async def test_list_rejects_invalid_limit(client_with_db) -> None:
     client, _ = client_with_db
-    assert (await client.get("/meetings?limit=0")).status_code == 422
-    assert (await client.get("/meetings?limit=999")).status_code == 422
-    assert (await client.get("/meetings?offset=-1")).status_code == 422
+    assert (await client.get("/api/meetings?limit=0")).status_code == 422
+    assert (await client.get("/api/meetings?limit=999")).status_code == 422
+    assert (await client.get("/api/meetings?offset=-1")).status_code == 422
 
 
 # ============================================================
@@ -361,7 +361,7 @@ async def test_get_meeting_returns_detail_with_transcript_and_minutes(
     action.evidence_id = action_ev.id
     await session.commit()
 
-    res = await client.get(f"/meetings/{meeting.id}")
+    res = await client.get(f"/api/meetings/{meeting.id}")
     assert res.status_code == 200
     body = res.json()
     assert body["id"] == meeting.id
@@ -378,14 +378,14 @@ async def test_get_meeting_returns_detail_with_transcript_and_minutes(
 
 async def test_get_meeting_404_when_not_found(client_with_db) -> None:
     client, _ = client_with_db
-    res = await client.get("/meetings/inexistente123")
+    res = await client.get("/api/meetings/inexistente123")
     assert res.status_code == 404
 
 
 async def test_get_meeting_404_when_soft_deleted(client_with_db) -> None:
     client, session = client_with_db
     m = await _create_meeting(session, soft_deleted=True)
-    res = await client.get(f"/meetings/{m.id}")
+    res = await client.get(f"/api/meetings/{m.id}")
     assert res.status_code == 404
 
 
@@ -395,7 +395,7 @@ async def test_get_meeting_returns_minimal_when_no_transcript_or_minutes(
     """Meeting recém-criada (pending) — transcript e minutes vêm None."""
     client, session = client_with_db
     m = await _create_meeting(session, status="pending")
-    res = await client.get(f"/meetings/{m.id}")
+    res = await client.get(f"/api/meetings/{m.id}")
     assert res.status_code == 200
     body = res.json()
     assert body["transcript"] is None
@@ -410,7 +410,7 @@ async def test_get_meeting_returns_minimal_when_no_transcript_or_minutes(
 async def test_status_returns_meeting_status(client_with_db) -> None:
     client, session = client_with_db
     m = await _create_meeting(session, status="transcribing")
-    res = await client.get(f"/meetings/{m.id}/status")
+    res = await client.get(f"/api/meetings/{m.id}/status")
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "transcribing"
@@ -424,7 +424,7 @@ async def test_status_includes_error_when_failed(client_with_db) -> None:
         status="failed",
         extra_metadata={"error": "Groq API down", "error_type": "RuntimeError"},
     )
-    res = await client.get(f"/meetings/{m.id}/status")
+    res = await client.get(f"/api/meetings/{m.id}/status")
     body = res.json()
     assert body["status"] == "failed"
     assert body["error"] == "Groq API down"
@@ -433,7 +433,7 @@ async def test_status_includes_error_when_failed(client_with_db) -> None:
 
 async def test_status_404_when_not_found(client_with_db) -> None:
     client, _ = client_with_db
-    res = await client.get("/meetings/nope/status")
+    res = await client.get("/api/meetings/nope/status")
     assert res.status_code == 404
 
 
@@ -446,7 +446,7 @@ async def test_speaker_map_set_and_replace(client_with_db) -> None:
     client, session = client_with_db
     m = await _create_meeting(session)
     res = await client.put(
-        f"/meetings/{m.id}/speaker-map",
+        f"/api/meetings/{m.id}/speaker-map",
         json={"speaker_map": {"SPEAKER_00": "João", "SPEAKER_01": "Maria"}},
     )
     assert res.status_code == 200
@@ -455,7 +455,7 @@ async def test_speaker_map_set_and_replace(client_with_db) -> None:
 
     # Substitui — não merge
     res2 = await client.put(
-        f"/meetings/{m.id}/speaker-map",
+        f"/api/meetings/{m.id}/speaker-map",
         json={"speaker_map": {"SPEAKER_00": "Pedro"}},
     )
     body2 = res2.json()
@@ -468,18 +468,18 @@ async def test_speaker_map_clear_with_empty_dict(client_with_db) -> None:
     m = await _create_meeting(session)
     # Setou primeiro
     await client.put(
-        f"/meetings/{m.id}/speaker-map",
+        f"/api/meetings/{m.id}/speaker-map",
         json={"speaker_map": {"SPEAKER_00": "João"}},
     )
     # Limpa
-    res = await client.put(f"/meetings/{m.id}/speaker-map", json={"speaker_map": {}})
+    res = await client.put(f"/api/meetings/{m.id}/speaker-map", json={"speaker_map": {}})
     assert res.json()["speaker_map"] == {}
 
 
 async def test_speaker_map_404_when_not_found(client_with_db) -> None:
     client, _ = client_with_db
     res = await client.put(
-        "/meetings/no/speaker-map",
+        "/api/meetings/no/speaker-map",
         json={"speaker_map": {"X": "Y"}},
     )
     assert res.status_code == 404
@@ -493,7 +493,7 @@ async def test_speaker_map_404_when_not_found(client_with_db) -> None:
 async def test_delete_soft_deletes(client_with_db) -> None:
     client, session = client_with_db
     m = await _create_meeting(session)
-    res = await client.delete(f"/meetings/{m.id}")
+    res = await client.delete(f"/api/meetings/{m.id}")
     assert res.status_code == 200
     assert res.json() == {"id": m.id, "deleted": True}
 
@@ -505,7 +505,7 @@ async def test_delete_soft_deletes(client_with_db) -> None:
 
 async def test_delete_404_when_not_found(client_with_db) -> None:
     client, _ = client_with_db
-    res = await client.delete("/meetings/no")
+    res = await client.delete("/api/meetings/no")
     assert res.status_code == 404
 
 
@@ -513,6 +513,6 @@ async def test_delete_idempotent_returns_404_second_time(client_with_db) -> None
     """Após soft delete, deletar de novo retorna 404 (já foi)."""
     client, session = client_with_db
     m = await _create_meeting(session)
-    await client.delete(f"/meetings/{m.id}")
-    res = await client.delete(f"/meetings/{m.id}")
+    await client.delete(f"/api/meetings/{m.id}")
+    res = await client.delete(f"/api/meetings/{m.id}")
     assert res.status_code == 404
