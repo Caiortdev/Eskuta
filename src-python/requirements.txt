@@ -62,3 +62,8 @@ google-genai==2.5.0
 # rapidfuzz: validação fuzzy de citações (quote vs transcrição). Versão
 # 3.14.5 (não 3.10.0 do relatório) — patch upgrade compat.
 rapidfuzz==3.14.5
+
+# --- Eval framework (Fase 1.9.5 / Bloco A.2) ---
+# jiwer: Word Error Rate (WER) pra comparar transcrição vs referência.
+# DER usa pyannote.metrics que já vem com pyannote.audio (1.5).
+jiwer==4.0.0

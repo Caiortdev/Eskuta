@@ -7,6 +7,9 @@
 pytest==8.3.3
 pytest-asyncio==0.24.0
 pytest-cov==5.0.0
+# pytest-benchmark: usado em tests/benchmarks/ (Fase 1.9.5 / Bloco A.4)
+# Rodar localmente: pytest tests/benchmarks/ --benchmark-only
+pytest-benchmark==5.2.3
 
 # --- Lint e auditoria ---
 ruff==0.6.9
