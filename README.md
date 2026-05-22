@@ -12,9 +12,6 @@
 - **Backend local (sidecar):** Python 3.11 + FastAPI, empacotado com PyInstaller
 - **Banco:** SQLite (MVP) → Postgres (produção). Migrations bilíngues.
 
-Detalhes em [`docs/MAPA_PROJETO.md`](docs/MAPA_PROJETO.md) e
-[`docs/RELATORIO_TECNICO.md`](docs/RELATORIO_TECNICO.md).
-
 ## Quick start
 
 Pré-requisitos: Node ≥ 20, Rust stable, Python **3.11.x** (não 3.12+),
@@ -74,5 +71,4 @@ docs/               Mapa do projeto, relatório técnico, schema, auditoria
 
 ## Roadmap
 
-Fase 0 (Setup) ✅ • Fase 1 (MVP Upload) 🚧 • Fase 2 (Tempo real) • Fase 3
-(Produto pago). Veja [`docs/RELATORIO_TECNICO.md`](docs/RELATORIO_TECNICO.md).
+Fase 0 (Setup) ✅ • Fase 1 (MVP Upload) 🚧 • Fase 2 (Tempo real) • Fase 3 (Arquitetura de Servidor)
