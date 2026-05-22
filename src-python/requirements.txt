@@ -9,7 +9,7 @@
 # GHSA-2c2j-9gv5-cj73, GHSA-59g5-xgcq-4qw3, etc). Atualizado na auditoria
 # da Fase 0 — ver docs/AUDIT-FASE-0.md.
 fastapi==0.136.1
-starlette==1.0.0
+starlette==1.0.1
 uvicorn[standard]==0.32.0
 python-multipart==0.0.29
 
