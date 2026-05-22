@@ -107,13 +107,13 @@ export const api = {
       if (params.limit !== undefined) qs.set("limit", String(params.limit));
       if (params.offset !== undefined) qs.set("offset", String(params.offset));
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
-      return request<MeetingListResponse>(`/meetings${suffix}`);
+      return request<MeetingListResponse>(`/api/meetings${suffix}`);
     },
 
-    get: (id: string) => request<MeetingDetail>(`/meetings/${id}`),
+    get: (id: string) => request<MeetingDetail>(`/api/meetings/${id}`),
 
     status: (id: string) =>
-      request<MeetingStatusResponse>(`/meetings/${id}/status`),
+      request<MeetingStatusResponse>(`/api/meetings/${id}/status`),
 
     upload: (file: File, options?: { title?: string; language?: string }) => {
       const formData = new FormData();
@@ -122,17 +122,20 @@ export const api = {
       if (options?.title) qs.set("title", options.title);
       if (options?.language) qs.set("language", options.language);
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
-      return requestForm<MeetingCreated>(`/meetings/upload${suffix}`, formData);
+      return requestForm<MeetingCreated>(
+        `/api/meetings/upload${suffix}`,
+        formData,
+      );
     },
 
     updateSpeakerMap: (id: string, speakerMap: Record<string, string>) =>
-      request<SpeakerMap>(`/meetings/${id}/speaker-map`, {
+      request<SpeakerMap>(`/api/meetings/${id}/speaker-map`, {
         method: "PUT",
         body: JSON.stringify({ speaker_map: speakerMap }),
       }),
 
     delete: (id: string) =>
-      request<DeleteResponse>(`/meetings/${id}`, { method: "DELETE" }),
+      request<DeleteResponse>(`/api/meetings/${id}`, { method: "DELETE" }),
   },
 
   keys: {
@@ -180,7 +183,7 @@ export const api = {
 
   transcribe: {
     start: (meetingId: string) =>
-      request<{ status: string; meeting_id: string }>("/transcribe/start", {
+      request<{ status: string; meeting_id: string }>("/api/transcribe/start", {
         method: "POST",
         body: JSON.stringify({ meeting_id: meetingId }),
       }),

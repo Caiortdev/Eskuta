@@ -74,7 +74,10 @@ class Settings(BaseSettings):
     # ============================================================
     # Limites operacionais
     # ============================================================
-    MAX_AUDIO_MB: int = 500
+    # Limite de upload em MB. Reuniões de 1-3h em MP3 320kbps dão 200-500MB;
+    # WAV/FLAC de 1h chegam a 1GB+; gravações multi-track 2-3h podem passar
+    # de 3GB. Limite generoso de 5GB cobre a maioria dos casos reais.
+    MAX_AUDIO_MB: int = 5120  # 5 GB
     CHUNK_DURATION_SEC: int = 600  # 10 min por chunk de áudio
     MAX_PARALLEL_CHUNKS: int = 4  # respeita free tier do Groq
     HTTP_TIMEOUT_SEC: int = 60

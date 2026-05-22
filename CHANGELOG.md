@@ -6,6 +6,20 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Diferido pra v0.2
+
+- **Diarização (pyannote)** — código existe em `src-python/app/services/diarization/`
+  e testes passam, mas torch+pyannote foram excluídos do bundle PyInstaller
+  pra reduzir tamanho (~2GB → ~115MB). Atas v0.1 saem sem identificação de
+  "quem falou o quê". Volta na v0.2 com bundle separado ou download
+  on-demand.
+- **Auto-update ativo** — plugin tauri-plugin-updater integrado, mas precisa
+  de servidor de updates real + chave Ed25519 assinada.
+- **Code signing** — sem certificado EV, SmartScreen mostra warning.
+- **macOS/Linux builds** — CI configurado, nunca rodado em produção.
+- **Screenshots dos consoles dos providers** — hotspot system pronto no
+  modal, mas imagens reais não foram capturadas.
+
 ### Adicionado
 
 - Atalhos de teclado globais: `Ctrl+H` (Home), `Ctrl+U` (Upload), `Ctrl+,` (Settings)

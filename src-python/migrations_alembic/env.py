@@ -8,13 +8,11 @@ Alembic env.py customizado pro Eskuta.
 
 from __future__ import annotations
 
-import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Importa settings e TODOS os models pra que Base.metadata esteja completo
 from app.core.settings import settings
@@ -42,11 +40,15 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Override do DSN com o caminho do settings (não hardcoded em alembic.ini)
+# Override do DSN com o caminho do settings (não hardcoded em alembic.ini).
+# Usamos engine SYNC aqui (sqlite:///) em vez de async (sqlite+aiosqlite:///)
+# porque migrations rodam uma vez no startup e Alembic com async tem o bug
+# do "asyncio.run() cannot be called from a running event loop" quando
+# chamado de dentro de um app FastAPI.
 settings.ensure_dirs()
 config.set_main_option(
     "sqlalchemy.url",
-    f"sqlite+aiosqlite:///{settings.DB_PATH}",
+    f"sqlite:///{settings.DB_PATH}",
 )
 
 target_metadata = Base.metadata
@@ -76,19 +78,16 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
-async def run_async_migrations() -> None:
-    connectable = async_engine_from_config(
+def run_migrations_online() -> None:
+    """Modo online sync — engine sync evita asyncio.run() conflict."""
+    connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
-
-
-def run_migrations_online() -> None:
-    asyncio.run(run_async_migrations())
+    with connectable.connect() as connection:
+        do_run_migrations(connection)
+    connectable.dispose()
 
 
 if context.is_offline_mode():

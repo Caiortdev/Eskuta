@@ -42,14 +42,39 @@ limiter = Limiter(
 )
 
 
+def _run_migrations_sync() -> None:
+    """
+    Roda Alembic upgrade head ANTES do FastAPI subir.
+
+    Importante: Alembic internamente chama `asyncio.run()`. Não pode ser
+    invocado de dentro de um event loop (@app.on_event("startup") async).
+    Por isso rodamos aqui no create_app() — sync, antes de FastAPI montar
+    seus event handlers.
+    """
+    try:
+        from app.db.migrations import run_migrations_upgrade_head
+
+        settings.ensure_dirs()
+        run_migrations_upgrade_head()
+    except Exception as exc:
+        logger.exception(
+            "Falha rodando migrations no boot. App pode ter erros de DB.",
+            err=str(exc),
+        )
+
+
 def create_app() -> FastAPI:
-    """Factory do app FastAPI. Garante logging + Sentry opt-in configurados."""
+    """Factory do app FastAPI. Garante logging + migrations + Sentry."""
     setup_logging()
 
     # Sentry no-op se DSN não setado. Antes de qualquer log/route.
     from app.services.observability import init_sentry_if_configured
 
     init_sentry_if_configured()
+
+    # Migrations ANTES do FastAPI subir — não pode ser dentro de
+    # @app.on_event("startup") porque Alembic usa asyncio.run() interno.
+    _run_migrations_sync()
 
     logger.info("Boot do sidecar Eskuta", version=__version__, **settings.safe_summary())
 

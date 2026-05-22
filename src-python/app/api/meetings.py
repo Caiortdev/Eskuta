@@ -55,7 +55,7 @@ from app.models import (
 )
 from app.services.minutes.pipeline import process_meeting
 
-router = APIRouter(prefix="/meetings", tags=["meetings"])
+router = APIRouter(prefix="/api/meetings", tags=["meetings"])
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
