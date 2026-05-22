@@ -17,6 +17,7 @@ import type {
   ProvidersListResponse,
   SimpleStatusResponse,
   SpeakerMap,
+  TestKeyResponse,
 } from "@/types/meeting";
 
 const SIDECAR_BASE_URL = "http://127.0.0.1:8765";
@@ -147,6 +148,34 @@ export const api = {
       request<SimpleStatusResponse>(`/api/keys/${provider}`, {
         method: "DELETE",
       }),
+
+    /**
+     * Testa a chave do provider chamando endpoint cheap (lista de modelos).
+     * Se `key` é fornecido, testa esse valor SEM salvar (pré-validação).
+     * Se omitido, testa a chave atualmente no keyring.
+     *
+     * Retorna sempre 200 — o veredito está em `status` ("valid" | "invalid" | "error").
+     */
+    test: (provider: ApiKeyProvider, key?: string) =>
+      request<TestKeyResponse>(`/api/keys/${provider}/test`, {
+        method: "POST",
+        body: JSON.stringify({ key: key ?? null }),
+      }),
+  },
+
+  diagnostics: {
+    /**
+     * Exporta logs com API keys mascaradas como ZIP.
+     * Retorna Blob — chamador deve disparar download via URL.createObjectURL.
+     */
+    exportLogs: async (): Promise<Blob> => {
+      const url = `${SIDECAR_BASE_URL}/api/diagnostics/export-logs`;
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) {
+        throw new ApiError(res.status, await res.text().catch(() => null));
+      }
+      return res.blob();
+    },
   },
 
   transcribe: {

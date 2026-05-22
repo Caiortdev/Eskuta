@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from app.api.diagnostics import router as diagnostics_router
 from app.api.keys import router as keys_router
 from app.api.meetings import router as meetings_router
 from app.api.transcription import router as transcription_router
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(keys_router)
     app.include_router(meetings_router)
     app.include_router(transcription_router)
+    app.include_router(diagnostics_router)
     return app
 
 

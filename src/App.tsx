@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
+import { UpdateChecker } from "@/components/UpdateChecker";
 import { Button } from "@/components/ui/button";
 import { ApiError, type HealthResponse, waitForSidecar } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <UpdateChecker />
       <Routes>
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route element={<AppLayout />}>

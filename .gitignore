@@ -36,6 +36,7 @@ src-python/**/__pycache__/
 src-python/*.egg-info/
 src-python/.pytest_cache/
 src-python/.pytest-tmp/
+.pytest-tmp/
 src-python/.mypy_cache/
 src-python/.ruff_cache/
 src-python/.tmp-db-test/
@@ -53,6 +54,8 @@ src-python/*.spec
 *.key
 credentials.json
 secrets.json
+# tmp/ guarda chaves Ed25519 do tauri-plugin-updater (scripts/generate-update-keys.ps1)
+tmp/
 
 # --- Dados do usuário em dev (paths em ~/.eskuta) ---
 # (ficam no home, não no repo — mas se alguém criar local pra teste)
