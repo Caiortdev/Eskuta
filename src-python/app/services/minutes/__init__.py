@@ -16,6 +16,14 @@ Os 6 princípios anti-alucinação do MAPA_PROJETO são aplicados em camadas:
 6. Chain-of-thought explícito  → System prompt (Fase 1.8)
 """
 
+from app.services.minutes.prompts import (
+    FEW_SHOT_EXAMPLE_MINUTES,
+    FEW_SHOT_EXAMPLE_TRANSCRIPT,
+    SYSTEM_PROMPT_MINUTES,
+    VALIDATION_PROMPT,
+    build_user_prompt,
+    build_validation_user_prompt,
+)
 from app.services.minutes.schemas import (
     ActionItem,
     Decision,
@@ -33,6 +41,10 @@ from app.services.minutes.validator import (
 
 __all__ = [
     "DEFAULT_FUZZY_THRESHOLD",
+    "FEW_SHOT_EXAMPLE_MINUTES",
+    "FEW_SHOT_EXAMPLE_TRANSCRIPT",
+    "SYSTEM_PROMPT_MINUTES",
+    "VALIDATION_PROMPT",
     "ActionItem",
     "Decision",
     "Evidence",
@@ -40,6 +52,8 @@ __all__ = [
     "MinutesOutput",
     "Topic",
     "ValidationReport",
+    "build_user_prompt",
+    "build_validation_user_prompt",
     "validate_evidence",
     "validate_minutes",
 ]
