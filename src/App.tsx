@@ -9,11 +9,18 @@
  */
 
 import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { UpdateChecker } from "@/components/UpdateChecker";
 import { Button } from "@/components/ui/button";
 import { ApiError, type HealthResponse, waitForSidecar } from "@/lib/api";
+import { useShortcuts } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { HomePage } from "@/pages/Home";
 import { MeetingDetailPage } from "@/pages/MeetingDetail";
@@ -53,6 +60,7 @@ function App() {
   return (
     <BrowserRouter>
       <UpdateChecker />
+      <ShortcutsHost />
       <Routes>
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route element={<AppLayout />}>
@@ -66,6 +74,40 @@ function App() {
       </Routes>
     </BrowserRouter>
   );
+}
+
+function ShortcutsHost() {
+  const navigate = useNavigate();
+  useShortcuts([
+    {
+      key: "u",
+      mod: true,
+      description: "Ir pra Nova reunião",
+      handler: (e) => {
+        e.preventDefault();
+        navigate("/upload");
+      },
+    },
+    {
+      key: ",",
+      mod: true,
+      description: "Abrir Configurações",
+      handler: (e) => {
+        e.preventDefault();
+        navigate("/settings");
+      },
+    },
+    {
+      key: "h",
+      mod: true,
+      description: "Ir pra Início (Reuniões)",
+      handler: (e) => {
+        e.preventDefault();
+        navigate("/");
+      },
+    },
+  ]);
+  return null;
 }
 
 function SidecarGate({

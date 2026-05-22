@@ -4,6 +4,7 @@
  */
 
 import { NavLink, Outlet } from "react-router-dom";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -42,8 +43,9 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="px-6 py-3 border-t text-xs text-muted-foreground">
-          MVP · Fase 1
+        <div className="px-6 py-3 border-t text-xs text-muted-foreground flex items-center justify-between gap-2">
+          <span>MVP · Fase 1</span>
+          <ThemeToggle compact />
         </div>
       </aside>
       <main className="flex-1 overflow-auto">

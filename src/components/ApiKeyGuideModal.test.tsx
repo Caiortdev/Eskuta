@@ -106,7 +106,7 @@ describe("ApiKeyGuideModal", () => {
       const { unmount } = render(
         <ApiKeyGuideModal provider={p} onClose={() => {}} />,
       );
-      const btn = screen.getByRole("button", { name: /^abrir / });
+      const btn = screen.getByRole("button", { name: /^abrir /i });
       await user.click(btn);
       expect(openSpy).toHaveBeenCalledWith(
         url,

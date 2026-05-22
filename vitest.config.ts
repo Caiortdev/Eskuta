@@ -25,6 +25,7 @@ export default defineConfig({
         "src/components/ui/**", // Shadcn components (cópia do upstream)
         "src/types/**", // Pure type declarations (no runtime code)
         "src/**/*.test.{ts,tsx}",
+        "e2e/**", // Playwright E2E tests, não vitest
       ],
       reporter: ["text", "html"],
       thresholds: {

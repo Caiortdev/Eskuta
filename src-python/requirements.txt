@@ -13,6 +13,13 @@ starlette==1.0.1
 uvicorn[standard]==0.32.0
 python-multipart==0.0.29
 
+# Rate limiting (defesa contra DoS local de outros processos)
+slowapi==0.1.9
+
+# Telemetria opt-in — ativada quando ESKUTA_SENTRY_DSN está setada.
+# Sem DSN, o SDK é no-op (não envia nada, não chama servidor).
+sentry-sdk==2.60.0
+
 # --- Validação e settings ---
 pydantic==2.9.0
 pydantic-settings==2.5.0

@@ -279,5 +279,104 @@ jobs:
           Copy-Item src-python/dist/eskuta-sidecar.exe `
                     src-tauri/binaries/eskuta-sidecar-x86_64-pc-windows-msvc.exe
 
+      - name: Smoke test sidecar empacotado
+        shell: pwsh
+        run: |
+          # Sobe o sidecar empacotado e bate em /health pra validar
+          # que o bundle PyInstaller realmente roda em máquina limpa
+          # (sem o venv Python). Mata o processo em 30s.
+          $sidecar = Start-Process -FilePath "src-python\dist\eskuta-sidecar.exe" `
+                                   -ArgumentList "--host", "127.0.0.1", "--port", "8766" `
+                                   -PassThru -WindowStyle Hidden
+          try {
+              # Espera até 20s pra subir
+              $ready = $false
+              for ($i = 0; $i -lt 20; $i++) {
+                  Start-Sleep -Seconds 1
+                  try {
+                      $r = Invoke-WebRequest -Uri "http://127.0.0.1:8766/health" -UseBasicParsing -TimeoutSec 2
+                      if ($r.StatusCode -eq 200) { $ready = $true; break }
+                  } catch {}
+              }
+              if (-not $ready) {
+                  Write-Host "::error::Sidecar empacotado não respondeu em 20s"
+                  exit 1
+              }
+              Write-Host "✓ Sidecar empacotado respondeu /health OK"
+
+              # Bate em /health/detailed também
+              $detailed = Invoke-WebRequest -Uri "http://127.0.0.1:8766/health/detailed" -UseBasicParsing
+              if ($detailed.StatusCode -ne 200) {
+                  Write-Host "::error::/health/detailed falhou ($($detailed.StatusCode))"
+                  exit 1
+              }
+              Write-Host "✓ /health/detailed OK"
+          } finally {
+              if ($sidecar -and -not $sidecar.HasExited) {
+                  Stop-Process -Id $sidecar.Id -Force
+              }
+          }
+
       - name: Tauri build (debug, sem assinatura)
         run: npm run tauri build -- --debug
+
+  # ============================================================
+  # Cross-platform smoke — apenas valida que Rust + frontend
+  # compilam em macOS e Linux. Não builda sidecar PyInstaller
+  # nem instalador completo (esses precisam de jobs dedicados
+  # por plataforma com tooling nativo).
+  # ============================================================
+  cross-platform-smoke:
+    name: Cross-platform smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri system deps (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Frontend build
+        run: npm run build
+
+      - name: Cargo check (sem sidecar binary)
+        working-directory: src-tauri
+        run: |
+          # Stage um binário placeholder pro Tauri externalBin não reclamar
+          mkdir -p binaries
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            TARGET=$(rustc -vV | sed -n 's|host: ||p')
+            touch "binaries/eskuta-sidecar-$TARGET"
+            chmod +x "binaries/eskuta-sidecar-$TARGET"
+          else
+            TARGET=$(rustc -vV | sed -n 's|host: ||p')
+            touch "binaries/eskuta-sidecar-$TARGET"
+            chmod +x "binaries/eskuta-sidecar-$TARGET"
+          fi
+          cargo check --all-targets
+        shell: bash
+
+      - name: Cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+        shell: bash

@@ -30,6 +30,7 @@ Decisões de design:
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -82,6 +83,12 @@ DEFAULT_MAX_REGEN_ATTEMPTS: Final[int] = 2  # Princípio do relatório §1.7.2
 SessionFactory = async_sessionmaker[AsyncSession]
 
 
+# Timeout global pra todo o pipeline. Reuniões longas de até ~4h devem
+# completar em 30min real time (chunks paralelos). Acima disso considera
+# patológico e aborta — meeting fica em failed.
+PIPELINE_TIMEOUT_SEC: int = 30 * 60
+
+
 async def process_meeting(
     meeting_id: str,
     *,
@@ -89,6 +96,7 @@ async def process_meeting(
     transcription_router: TranscriptionRouter | None = None,
     llm_router: LLMRouter | None = None,
     max_regen_attempts: int = DEFAULT_MAX_REGEN_ATTEMPTS,
+    timeout_sec: int = PIPELINE_TIMEOUT_SEC,
 ) -> None:
     """
     Pipeline completo. Carrega meeting do DB, processa, persiste,
@@ -101,6 +109,7 @@ async def process_meeting(
         transcription_router: router de STT; default usa `TranscriptionRouter()`.
         llm_router: router de LLM; default usa `LLMRouter()`.
         max_regen_attempts: regen pra validação falha (default 2 por relatório).
+        timeout_sec: tempo máximo total; após isso meeting vira failed.
     """
     factory: SessionFactory = session_factory or AsyncSessionLocal
     tx_router = transcription_router or TranscriptionRouter()
@@ -113,13 +122,24 @@ async def process_meeting(
             return
 
         try:
-            await _run_pipeline(
-                db=db,
-                meeting=meeting,
-                tx_router=tx_router,
-                llm_router=ll_router,
-                max_regen_attempts=max_regen_attempts,
+            await asyncio.wait_for(
+                _run_pipeline(
+                    db=db,
+                    meeting=meeting,
+                    tx_router=tx_router,
+                    llm_router=ll_router,
+                    max_regen_attempts=max_regen_attempts,
+                ),
+                timeout=timeout_sec,
             )
+        except TimeoutError:
+            logger.error(
+                "Pipeline excedeu timeout",
+                meeting_id=meeting_id,
+                timeout_sec=timeout_sec,
+            )
+            timeout_exc = TimeoutError(f"Pipeline excedeu {timeout_sec}s")
+            await _mark_failed(db, meeting, timeout_exc)
         except Exception as exc:
             logger.exception("Pipeline falhou", meeting_id=meeting_id)
             await _mark_failed(db, meeting, exc)

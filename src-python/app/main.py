@@ -14,9 +14,14 @@ import argparse
 import sys
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from loguru import logger
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from app.api.diagnostics import router as diagnostics_router
 from app.api.keys import router as keys_router
@@ -27,10 +32,25 @@ from app.core.settings import settings
 
 __version__ = "0.1.0"
 
+# Rate limiter global: chave = IP do remoto (sempre 127.0.0.1 localhost).
+# Defesa contra outros processos locais maliciosos que descubram a porta
+# e tentem martelar endpoints (drain credito user, DoS).
+# Limites permissivos pro uso normal do app, agressivos contra abuso.
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["120/minute", "30/second"],
+)
+
 
 def create_app() -> FastAPI:
-    """Factory do app FastAPI. Garante logging configurado antes."""
+    """Factory do app FastAPI. Garante logging + Sentry opt-in configurados."""
     setup_logging()
+
+    # Sentry no-op se DSN não setado. Antes de qualquer log/route.
+    from app.services.observability import init_sentry_if_configured
+
+    init_sentry_if_configured()
+
     logger.info("Boot do sidecar Eskuta", version=__version__, **settings.safe_summary())
 
     app = FastAPI(
@@ -41,6 +61,22 @@ def create_app() -> FastAPI:
             "só aceita conexões do frontend Tauri rodando localmente."
         ),
     )
+
+    # Rate limiter — anexa state ao app + handler customizado
+    app.state.limiter = limiter
+
+    @app.exception_handler(RateLimitExceeded)
+    async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": f"Rate limit excedido ({exc.detail}). Espere alguns segundos.",
+            },
+        )
+
+    # Middleware aplica default_limits a TODOS os endpoints (defesa global).
+    # Endpoints específicos podem ter limits adicionais via @limiter.limit()
+    app.add_middleware(SlowAPIMiddleware)
 
     # CORS restrito às origens do frontend Tauri (dev: vite em :1420;
     # prod: tauri://localhost). IMPORTANTE: nada de "*" em allow_origins
@@ -67,10 +103,115 @@ def create_app() -> FastAPI:
             "environment": settings.ENVIRONMENT,
         }
 
+    @app.get("/health/detailed")
+    async def health_detailed() -> dict[str, object]:
+        """
+        Health check granular — verifica DB writable, disco com espaço,
+        keyring acessível, dirs do app existem.
+
+        Retorna 200 sempre, com `status` por componente. Útil pra dashboards
+        de suporte (export-logs inclui esse output).
+        """
+        import shutil
+
+        from app.db.database import create_engine_from_settings
+        from app.services import keys as keys_service
+
+        checks: dict[str, dict[str, object]] = {}
+
+        # 1. DB writable
+        try:
+            engine = create_engine_from_settings()
+            async with engine.connect() as conn:
+                await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+            await engine.dispose()
+            checks["db"] = {"status": "ok"}
+        except Exception as exc:
+            checks["db"] = {"status": "error", "error": exc.__class__.__name__}
+
+        # 2. Disco com espaço (>= 1GB livre no APP_DIR)
+        try:
+            total, used, free = shutil.disk_usage(str(settings.APP_DIR))
+            free_mb = free // (1024 * 1024)
+            checks["disk"] = {
+                "status": "ok" if free_mb >= 1024 else "low",
+                "free_mb": free_mb,
+            }
+        except Exception as exc:
+            checks["disk"] = {"status": "error", "error": exc.__class__.__name__}
+
+        # 3. Keyring acessível (não revela valores)
+        try:
+            _ = keys_service.list_configured_providers()
+            checks["keyring"] = {"status": "ok"}
+        except Exception as exc:
+            checks["keyring"] = {"status": "error", "error": exc.__class__.__name__}
+
+        # 4. Dirs do app existem (logs, uploads)
+        checks["dirs"] = {
+            "status": "ok",
+            "app_dir_exists": settings.APP_DIR.exists(),
+            "logs_dir_exists": settings.LOGS_DIR.exists(),
+            "uploads_dir_exists": settings.UPLOADS_DIR.exists(),
+        }
+
+        # Status geral: ok se todos forem ok/low, error caso contrário
+        overall = (
+            "ok" if all(c.get("status") in ("ok", "low") for c in checks.values()) else "degraded"
+        )
+
+        return {
+            "status": overall,
+            "version": __version__,
+            "checks": checks,
+        }
+
+    @app.get("/metrics")
+    async def metrics() -> dict[str, object]:
+        """Counters em memória (reset a cada restart). Útil pra dashboards locais."""
+        from app.services.observability import get_counters
+
+        return {
+            "counters": get_counters(),
+            "version": __version__,
+        }
+
     app.include_router(keys_router)
     app.include_router(meetings_router)
     app.include_router(transcription_router)
     app.include_router(diagnostics_router)
+
+    # Pre-warm: triggera import dos SDKs lazy no startup (não chama a API,
+    # só importa o módulo Python). Primeira request fica ~200-500ms mais
+    # rápida por não pagar o import.
+    @app.on_event("startup")
+    async def _prewarm_sdks() -> None:
+        try:
+            import importlib
+
+            for mod in ("groq", "anthropic", "openai", "httpx"):
+                importlib.import_module(mod)
+            logger.debug("SDKs pre-warmed")
+        except ImportError as exc:
+            # Falha silenciosa — SDKs são opcionais (import lazy só pra paths que usam)
+            logger.debug("Pre-warm skipped: {err}", err=exc)
+
+    # Reaper: marca meetings travadas em status intermediário (de sessões
+    # anteriores que crasharam) como failed pra não ficarem pra sempre.
+    @app.on_event("startup")
+    async def _reap_stale_meetings() -> None:
+        try:
+            from app.db.database import AsyncSessionLocal
+            from app.services.reaper import reap_stale_meetings
+
+            async with AsyncSessionLocal() as db:
+                n = await reap_stale_meetings(db)
+                if n > 0:
+                    logger.info("Reaper marcou meetings travadas", count=n)
+        except Exception as exc:
+            # Reaper falhar não impede o app subir
+            logger.warning("Reaper falhou no startup: {err}", err=exc)
+
     return app
 
 

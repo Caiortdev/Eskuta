@@ -117,11 +117,11 @@ def main() -> None:
     # Sanity: confirma que o binário existe
     output = ROOT / "dist" / TARGET_NAME_FILE
     if not output.exists():
-        sys.exit(f"❌ Build falhou: {output} não foi gerado")
+        sys.exit(f"[ERROR] Build falhou: {output} nao foi gerado")
 
     size_mb = output.stat().st_size / (1024 * 1024)
-    print(f"\n✅ Sidecar empacotado: {output}")
-    print(f"   Tamanho: {size_mb:.1f} MB")
+    print(f"\n[OK] Sidecar empacotado: {output}")
+    print(f"     Tamanho: {size_mb:.1f} MB")
 
 
 def cleanup_build_artifacts() -> None:
@@ -129,7 +129,7 @@ def cleanup_build_artifacts() -> None:
     for path in [ROOT / "build", ROOT / "dist"]:
         if path.exists():
             shutil.rmtree(path)
-            print(f"🗑️  Removido: {path}")
+            print(f"[clean] Removido: {path}")
 
 
 if __name__ == "__main__":

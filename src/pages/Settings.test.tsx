@@ -108,12 +108,16 @@ describe("SettingsPage", () => {
     apiMocks.list.mockResolvedValue({ providers: ALL_PROVIDERS });
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText(/^groq$/i)).toBeInTheDocument();
+      // Cada provider aparece em 2+ lugares (h3 do card + botão "Como obter
+      // minha chave do X"); checamos apenas que aparece em pelo menos um.
+      expect(screen.getAllByText(/^groq$/i).length).toBeGreaterThan(0);
     });
-    expect(screen.getByText(/^assemblyai$/i)).toBeInTheDocument();
-    expect(screen.getByText(/anthropic \(claude\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/openai \(gpt\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/google \(gemini\)/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^assemblyai$/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/anthropic \(claude\)/i).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText(/openai \(gpt\)/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/google \(gemini\)/i).length).toBeGreaterThan(0);
   });
 
   it("provider configurado mostra 'Configurada' + última validação", async () => {
@@ -193,7 +197,9 @@ describe("SettingsPage", () => {
     )!;
     await user.click(saveBtn);
     await waitFor(() => {
-      expect(screen.getByText(/chave rejeitada/i)).toBeInTheDocument();
+      // "Chave rejeitada" pode aparecer no banner do test result + texto do guide;
+      // basta que apareça pelo menos uma vez
+      expect(screen.getAllByText(/chave rejeitada/i).length).toBeGreaterThan(0);
     });
     expect(apiMocks.save).not.toHaveBeenCalled();
   });
@@ -210,7 +216,9 @@ describe("SettingsPage", () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText(/anthropic \(claude\)/i)).toBeInTheDocument();
+      expect(
+        screen.getAllByText(/anthropic \(claude\)/i).length,
+      ).toBeGreaterThan(0);
     });
     const buttons = screen.getAllByRole("button", { name: /testar agora/i });
     expect(buttons.length).toBe(1); // só anthropic está configurada
