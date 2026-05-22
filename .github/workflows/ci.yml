@@ -292,24 +292,46 @@ jobs:
           # Sobe o sidecar empacotado e bate em /health pra validar
           # que o bundle PyInstaller realmente roda em máquina limpa.
           # Path da pasta --onedir: src-python/dist/eskuta-sidecar/eskuta-sidecar.exe
-          $sidecar = Start-Process -FilePath "src-python\dist\eskuta-sidecar\eskuta-sidecar.exe" `
-                                   -ArgumentList "--host", "127.0.0.1", "--port", "8766" `
-                                   -PassThru -WindowStyle Hidden
+          # IMPORTANTE: --windowed do PyInstaller redireciona stdout/stderr
+          # pro NUL por default. Capturamos manualmente pra debug se falhar.
+          $stdoutLog = "$env:TEMP\sidecar-stdout.log"
+          $stderrLog = "$env:TEMP\sidecar-stderr.log"
+          $sidecar = Start-Process `
+              -FilePath "src-python\dist\eskuta-sidecar\eskuta-sidecar.exe" `
+              -ArgumentList "--host", "127.0.0.1", "--port", "8766" `
+              -PassThru -WindowStyle Hidden `
+              -RedirectStandardOutput $stdoutLog `
+              -RedirectStandardError $stderrLog
           try {
-              # Espera até 20s pra subir
+              # Espera até 60s pra subir (GH Actions runner é mais lento
+              # que dev local; cold start com migrations + uvicorn pode levar ~15-30s)
               $ready = $false
-              for ($i = 0; $i -lt 20; $i++) {
+              for ($i = 0; $i -lt 60; $i++) {
                   Start-Sleep -Seconds 1
                   try {
                       $r = Invoke-WebRequest -Uri "http://127.0.0.1:8766/health" -UseBasicParsing -TimeoutSec 2
-                      if ($r.StatusCode -eq 200) { $ready = $true; break }
+                      if ($r.StatusCode -eq 200) {
+                          $ready = $true
+                          Write-Host "Sidecar respondeu em $($i+1)s"
+                          break
+                      }
                   } catch {}
               }
               if (-not $ready) {
-                  Write-Host "::error::Sidecar empacotado não respondeu em 20s"
+                  Write-Host "::error::Sidecar empacotado nao respondeu em 60s"
+                  Write-Host "--- stdout do sidecar ---"
+                  if (Test-Path $stdoutLog) { Get-Content $stdoutLog -Tail 50 } else { Write-Host "(vazio)" }
+                  Write-Host "--- stderr do sidecar ---"
+                  if (Test-Path $stderrLog) { Get-Content $stderrLog -Tail 50 } else { Write-Host "(vazio)" }
+                  Write-Host "--- processo ainda vivo? ---"
+                  if ($sidecar -and -not $sidecar.HasExited) {
+                      Write-Host "Sim, PID $($sidecar.Id)"
+                  } else {
+                      Write-Host "Nao, sidecar morreu. Exit code: $($sidecar.ExitCode)"
+                  }
                   exit 1
               }
-              Write-Host "✓ Sidecar empacotado respondeu /health OK"
+              Write-Host "[OK] Sidecar empacotado respondeu /health OK"
 
               # Bate em /health/detailed também
               $detailed = Invoke-WebRequest -Uri "http://127.0.0.1:8766/health/detailed" -UseBasicParsing
@@ -317,7 +339,7 @@ jobs:
                   Write-Host "::error::/health/detailed falhou ($($detailed.StatusCode))"
                   exit 1
               }
-              Write-Host "✓ /health/detailed OK"
+              Write-Host "[OK] /health/detailed OK"
           } finally {
               if ($sidecar -and -not $sidecar.HasExited) {
                   Stop-Process -Id $sidecar.Id -Force
