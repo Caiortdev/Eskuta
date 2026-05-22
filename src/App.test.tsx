@@ -43,17 +43,20 @@ beforeEach(() => {
 });
 
 describe("App — gate de sidecar", () => {
-  it("mostra 'Aguardando sidecar' enquanto health não responde", () => {
+  it("mostra splash 'Iniciando' enquanto health não responde", () => {
     waitForSidecarMock.mockReturnValue(new Promise(() => {})); // never resolves
     render(<App />);
-    expect(screen.getByText(/aguardando sidecar/i)).toBeInTheDocument();
+    // Splash mostra "Iniciando…" como primeira mensagem
+    expect(screen.getByText(/iniciando/i)).toBeInTheDocument();
   });
 
   it("mostra mensagem de erro quando waitForSidecar rejeita com Error", async () => {
     waitForSidecarMock.mockRejectedValue(new Error("connection refused"));
     render(<App />);
     await waitFor(() => {
-      expect(screen.getByText(/sidecar não respondeu/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/não consegui iniciar o eskuta/i),
+      ).toBeInTheDocument();
     });
     expect(screen.getByText(/connection refused/i)).toBeInTheDocument();
   });
@@ -64,7 +67,9 @@ describe("App — gate de sidecar", () => {
     );
     render(<App />);
     await waitFor(() => {
-      expect(screen.getByText(/sidecar não respondeu/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/não consegui iniciar o eskuta/i),
+      ).toBeInTheDocument();
     });
     expect(screen.getByText(/503/)).toBeInTheDocument();
   });

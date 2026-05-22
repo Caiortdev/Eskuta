@@ -141,15 +141,16 @@ jobs:
           workspaces: src-tauri
 
       # O build.rs do Tauri lê tauri.conf.json e exige que cada
-      # externalBin exista pro target atual. Como o sidecar real só
-      # é empacotado no job tauri-build (Windows), criamos um stub
-      # vazio aqui pra clippy poder rodar (clippy só faz análise
-      # estática, não executa o binário).
-      - name: Stub sidecar binary (apenas pra clippy aceitar)
+      # resource glob bata em pelo menos 1 arquivo. Como o sidecar
+      # real (--onedir pasta) só é empacotado no job tauri-build
+      # (Windows), criamos uma pasta stub com um arquivo dentro pra
+      # clippy poder rodar (clippy só faz análise estática).
+      - name: Stub sidecar folder (apenas pra clippy aceitar)
         run: |
-          mkdir -p src-tauri/binaries
-          touch src-tauri/binaries/eskuta-sidecar-x86_64-unknown-linux-gnu
-          chmod +x src-tauri/binaries/eskuta-sidecar-x86_64-unknown-linux-gnu
+          mkdir -p src-tauri/binaries/eskuta-sidecar
+          echo "stub" > src-tauri/binaries/eskuta-sidecar/eskuta-sidecar.exe
+          mkdir -p src-tauri/binaries/eskuta-sidecar/_internal
+          echo "stub" > src-tauri/binaries/eskuta-sidecar/_internal/stub.txt
 
       - name: cargo fmt --check
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
@@ -359,22 +360,17 @@ jobs:
       - name: Frontend build
         run: npm run build
 
-      - name: Cargo check (sem sidecar binary)
+      - name: Cargo check (sem sidecar real, stub pra o glob de resources passar)
         working-directory: src-tauri
-        run: |
-          # Stage um binário placeholder pro Tauri externalBin não reclamar
-          mkdir -p binaries
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            TARGET=$(rustc -vV | sed -n 's|host: ||p')
-            touch "binaries/eskuta-sidecar-$TARGET"
-            chmod +x "binaries/eskuta-sidecar-$TARGET"
-          else
-            TARGET=$(rustc -vV | sed -n 's|host: ||p')
-            touch "binaries/eskuta-sidecar-$TARGET"
-            chmod +x "binaries/eskuta-sidecar-$TARGET"
-          fi
-          cargo check --all-targets
         shell: bash
+        run: |
+          # tauri.conf.json tem bundle.resources apontando pra
+          # binaries/eskuta-sidecar/**/* — precisa de pelo menos 1
+          # arquivo lá pra o build.rs aceitar.
+          mkdir -p binaries/eskuta-sidecar/_internal
+          echo "stub" > binaries/eskuta-sidecar/eskuta-sidecar.exe
+          echo "stub" > binaries/eskuta-sidecar/_internal/stub.txt
+          cargo check --all-targets
 
       - name: Cargo clippy
         working-directory: src-tauri
