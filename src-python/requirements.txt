@@ -18,7 +18,8 @@ pydantic==2.9.0
 pydantic-settings==2.5.0
 
 # --- HTTP client (chamadas a APIs externas) ---
-httpx==0.27.0
+# 0.28.1 (não 0.27.0 do relatório) — google-genai requer >=0.28.
+httpx==0.28.1
 
 # --- Banco de dados (Etapa 1.2) ---
 sqlalchemy==2.0.35
@@ -49,3 +50,10 @@ assemblyai==0.64.3
 # (~500MB) baixa do Hugging Face Hub na primeira execução — precisa HF_TOKEN.
 # Versão 4.0.4 (não 3.3.2 do relatório) por compat com torchaudio 2.11+.
 pyannote.audio==4.0.4
+
+# --- Camada de LLM (Etapa 1.6) ---
+# 3 SDKs oficiais — usuário escolhe qual usar plugando a key dele.
+# google-genai (novo) substitui google-generativeai (deprecated em 2024).
+anthropic==0.104.0
+openai==2.38.0
+google-genai==2.5.0
