@@ -86,6 +86,15 @@ class Settings(BaseSettings):
     PORT: int = 8765
 
     # ============================================================
+    # Tokens APP-level (não user-level — vêm do .env / build secret)
+    # ============================================================
+    # HF_TOKEN: pra baixar o modelo pyannote/speaker-diarization-3.1
+    # (Etapa 1.5). É da configuração do APP, NÃO de cada usuário final.
+    # Sem token → diarização desabilita gracefully (transcrição segue
+    # funcionando sem identificação de speakers).
+    HF_TOKEN: str | None = None
+
+    # ============================================================
     # Observabilidade
     # ============================================================
     LOG_LEVEL_CONSOLE: str = "INFO"

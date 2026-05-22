@@ -43,3 +43,9 @@ silero-vad==5.1.2
 # assemblyai: SDK oficial do fallback (modelo Universal, suporta pt-BR).
 groq==1.2.0
 assemblyai==0.64.3
+
+# --- Camada de diarização (Etapa 1.5) ---
+# pyannote.audio: identifica QUEM falou quando. Modelo "speaker-diarization-3.1"
+# (~500MB) baixa do Hugging Face Hub na primeira execução — precisa HF_TOKEN.
+# Versão 4.0.4 (não 3.3.2 do relatório) por compat com torchaudio 2.11+.
+pyannote.audio==4.0.4
