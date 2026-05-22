@@ -41,6 +41,11 @@ loguru==0.7.2
 keyring==25.4.1
 
 # --- Pipeline de áudio (Etapa 1.3) ---
+# imageio-ffmpeg: traz ffmpeg.exe estático embutido (~30MB). Usado em
+# vez de exigir ffmpeg no PATH do usuário — fundamental pra bundle
+# PyInstaller funcionar sem dependência externa.
+imageio-ffmpeg==0.5.1
+
 # ffmpeg-python: wrapper Python sobre o binário ffmpeg (precisa estar no PATH).
 # silero-vad: modelo leve de Voice Activity Detection (~30MB do torch.hub).
 ffmpeg-python==0.2.0

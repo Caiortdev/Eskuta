@@ -12,6 +12,7 @@ Reduz drasticamente o tamanho: 3h MP4 (~1.5GB) → ~40MB MP3.
 from __future__ import annotations
 
 import asyncio
+from functools import lru_cache
 from pathlib import Path
 
 import ffmpeg
@@ -24,6 +25,23 @@ class AudioConversionError(RuntimeError):
     def __init__(self, message: str, stderr: str | None = None) -> None:
         super().__init__(message)
         self.stderr = stderr
+
+
+@lru_cache(maxsize=1)
+def _ffmpeg_exe() -> str:
+    """
+    Retorna o path do ffmpeg.exe a ser usado.
+
+    Em produção (PyInstaller bundle), usa imageio_ffmpeg que traz
+    ffmpeg estático embutido (~30MB). Em dev/sistema, cai pro `ffmpeg`
+    do PATH se imageio_ffmpeg não estiver disponível.
+    """
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        return "ffmpeg"  # fallback pro PATH
 
 
 def convert_to_optimized_mp3(
@@ -61,7 +79,14 @@ def convert_to_optimized_mp3(
         stream = ffmpeg.overwrite_output(stream)
 
     try:
-        ffmpeg.run(stream, capture_stdout=True, capture_stderr=True)
+        # cmd= força usar nosso ffmpeg embutido (imageio_ffmpeg), evitando
+        # dependência do ffmpeg no PATH do usuário
+        ffmpeg.run(
+            stream,
+            cmd=_ffmpeg_exe(),
+            capture_stdout=True,
+            capture_stderr=True,
+        )
     except ffmpeg.Error as exc:  # pragma: no cover — depende de ffmpeg binário
         stderr_text = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else None
         logger.error(

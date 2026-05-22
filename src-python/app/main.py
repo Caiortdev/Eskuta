@@ -103,17 +103,19 @@ def create_app() -> FastAPI:
     # Endpoints específicos podem ter limits adicionais via @limiter.limit()
     app.add_middleware(SlowAPIMiddleware)
 
-    # CORS restrito às origens do frontend Tauri (dev: vite em :1420;
-    # prod: tauri://localhost). IMPORTANTE: nada de "*" em allow_origins
-    # por questão de segurança.
+    # CORS — Tauri webview no Windows usa schemes variados
+    # (http://tauri.localhost, https://tauri.localhost, tauri://localhost,
+    # ou ainda http://localhost com porta aleatória do WebView2). Em vez
+    # de listar manualmente (e quebrar como aconteceu), usamos regex
+    # cobrindo TODOS os schemes/portas locais. Como o sidecar bind em
+    # 127.0.0.1 apenas, nenhuma origem fora da máquina alcança.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:1420",
-            "http://tauri.localhost",
-            "tauri://localhost",
-            "https://tauri.localhost",
-        ],
+        allow_origin_regex=(
+            r"^(https?|tauri)://"
+            r"(localhost|127\.0\.0\.1|tauri\.localhost|asset\.localhost)"
+            r"(:\d+)?$"
+        ),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allow_headers=["*"],

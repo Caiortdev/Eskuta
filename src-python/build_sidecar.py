@@ -188,6 +188,11 @@ VSVersionInfo(
         "pydantic",
         "pydantic_settings",
         "loguru",
+        # imageio_ffmpeg traz ffmpeg.exe estatico — collect-all é
+        # CRITICO porque o binario fica em <pkg>/binaries/ffmpeg.exe
+        # e precisa ser copiado pro bundle. Sem isso, conversao de
+        # audio falha com "ffmpeg not found" em maquina sem ffmpeg.
+        "imageio_ffmpeg",
     ]
     for mod in COLLECT_ALL:
         args.extend(["--collect-all", mod])
