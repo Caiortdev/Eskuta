@@ -8,6 +8,7 @@ import httpx
 import keyring
 import keyring.backend
 import pytest
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Importa todos os models ANTES da app FastAPI pra garantir que estão
@@ -116,3 +117,28 @@ def in_memory_keyring() -> Iterator[_InMemoryKeyring]:
         yield backend
     finally:
         keyring.set_keyring(original)
+
+
+@pytest.fixture
+def loguru_messages() -> Iterator[list[str]]:
+    """
+    Captura mensagens emitidas via `loguru.logger` durante um teste.
+
+    `caplog` do pytest só pega o logging stdlib — Loguru tem seu próprio
+    pipeline e escreve direto em stderr. Use esta fixture quando precisar
+    asserir algo sobre o conteúdo de um log (positivo ou negativo) emitido
+    via Loguru, por exemplo verificar que uma API key NÃO aparece no log.
+
+    O formato inclui `{extra}` pra que os kwargs estruturados (ex:
+    `logger.info("msg", provider="groq")`) sejam parte do texto capturado.
+    """
+    captured: list[str] = []
+    sink_id = logger.add(
+        lambda message: captured.append(str(message)),
+        level="DEBUG",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message} | {extra}",
+    )
+    try:
+        yield captured
+    finally:
+        logger.remove(sink_id)

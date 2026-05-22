@@ -37,3 +37,9 @@ keyring==25.4.1
 # silero-vad: modelo leve de Voice Activity Detection (~30MB do torch.hub).
 ffmpeg-python==0.2.0
 silero-vad==5.1.2
+
+# --- Camada de transcrição (Etapa 1.4) ---
+# groq: SDK oficial pro Whisper Large v3 Turbo (provider STT primário).
+# assemblyai: SDK oficial do fallback (modelo Universal, suporta pt-BR).
+groq==1.2.0
+assemblyai==0.64.3
