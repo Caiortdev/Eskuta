@@ -49,11 +49,20 @@ export interface HealthResponse {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Content-Type só pra requests com body (POST/PUT/PATCH). Em GET/DELETE,
+  // adicionar Content-Type força CORS preflight desnecessário (request
+  // deixa de ser "simple") — em Tauri webview isso pode falhar
+  // silenciosamente com "Failed to fetch".
+  const hasBody = init?.body != null;
+  const baseHeaders: Record<string, string> = hasBody
+    ? { "Content-Type": "application/json" }
+    : {};
+
   const res = await fetch(`${SIDECAR_BASE_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
+      ...baseHeaders,
+      ...(init?.headers as Record<string, string> | undefined),
     },
   });
 
