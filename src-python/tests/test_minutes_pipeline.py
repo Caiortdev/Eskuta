@@ -1,14 +1,17 @@
 """
 Testes do pipeline (app.services.minutes.pipeline.process_meeting).
 
-Como o pipeline orquestra 6+ serviços externos (ffmpeg, silero, groq,
-pyannote, claude/gpt/gemini), todos são mockados via monkeypatch.
-Os testes focam em:
+Como o pipeline orquestra 5+ serviços externos (ffmpeg, silero, groq,
+claude/gpt/gemini), todos são mockados via monkeypatch. Os testes focam
+em:
 - Status updates em cada estágio
 - Regen loop quando validate_minutes falha (até max_attempts)
 - mark_failed em qualquer exceção
 - session_factory injectability (importante pra testes)
-- Diarização opcional (sem HF_TOKEN → skip gracefully)
+
+Diarização foi removida do pipeline v0.1 (pesa CPU demais — pyannote leva
+5-10min em CPU pra reunião de 20min). Testes específicos de diarização
+foram removidos. Plano v0.2: opt-in via AssemblyAI cloud ou pyannote GPU.
 """
 
 from __future__ import annotations
@@ -25,7 +28,6 @@ from app.db.base import Base
 from app.models import Meeting, Minutes, Transcript
 from app.services.audio.chunker import AudioChunk
 from app.services.audio.vad import SpeechSegment
-from app.services.diarization.pyannote_service import SpeakerSegment
 from app.services.llm.base import LLMMessage, LLMProvider, LLMResponse
 from app.services.llm.router import LLMRouter
 from app.services.minutes.pipeline import process_meeting
@@ -195,10 +197,13 @@ def _patch_settings_processed_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 
 
 def _patch_diarization_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "app.services.minutes.pipeline.diarization_is_available",
-        lambda: False,
-    )
+    """
+    No-op em v0.1 — diarização foi removida do pipeline (sem chamada
+    a `diarization_is_available`). Mantemos o helper pra que chamadas
+    existentes nos testes não quebrem, e pra documentar que diarização
+    ficou pra v0.2.
+    """
+    del monkeypatch
 
 
 # ============================================================
@@ -242,73 +247,10 @@ async def test_pipeline_runs_all_stages_and_marks_completed(
         assert minutes.validation_passed is True
 
 
-async def test_pipeline_diarization_runs_when_available(
-    monkeypatch: pytest.MonkeyPatch,
-    session_factory,
-    meeting_row,
-    tmp_path,
-) -> None:
-    _patch_audio_pipeline(monkeypatch, tmp_path)
-    _patch_settings_processed_dir(monkeypatch, tmp_path)
-
-    # Diarização disponível e devolve 1 speaker_segment
-    monkeypatch.setattr(
-        "app.services.minutes.pipeline.diarization_is_available",
-        lambda: True,
-    )
-
-    def fake_diarize(audio_path):
-        return [SpeakerSegment(start_sec=0.0, end_sec=3.0, speaker_id="SPEAKER_00")]
-
-    monkeypatch.setattr("app.services.minutes.pipeline.diarize", fake_diarize)
-
-    tx_router = TranscriptionRouter([_FakeTxProvider()])
-    llm_router = LLMRouter({"fake": _FakeLLMProvider([_example_minutes_json()])})
-
-    await process_meeting(
-        meeting_row.id,
-        session_factory=session_factory,
-        transcription_router=tx_router,
-        llm_router=llm_router,
-    )
-
-    async with session_factory() as db:
-        m = await db.get(Meeting, meeting_row.id)
-        assert m.status == "completed"
-
-
-async def test_pipeline_diarization_failure_does_not_stop(
-    monkeypatch: pytest.MonkeyPatch,
-    session_factory,
-    meeting_row,
-    tmp_path,
-) -> None:
-    """Se diarização explodir, pipeline segue sem speaker labels."""
-    _patch_audio_pipeline(monkeypatch, tmp_path)
-    _patch_settings_processed_dir(monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        "app.services.minutes.pipeline.diarization_is_available",
-        lambda: True,
-    )
-
-    def boom(audio_path):
-        raise RuntimeError("pyannote down")
-
-    monkeypatch.setattr("app.services.minutes.pipeline.diarize", boom)
-
-    tx_router = TranscriptionRouter([_FakeTxProvider()])
-    llm_router = LLMRouter({"fake": _FakeLLMProvider([_example_minutes_json()])})
-
-    await process_meeting(
-        meeting_row.id,
-        session_factory=session_factory,
-        transcription_router=tx_router,
-        llm_router=llm_router,
-    )
-
-    async with session_factory() as db:
-        m = await db.get(Meeting, meeting_row.id)
-        assert m.status == "completed"  # apesar do erro na diarização
+# Testes de diarização (test_pipeline_diarization_runs_when_available
+# e test_pipeline_diarization_failure_does_not_stop) foram REMOVIDOS
+# em v0.1 — diarização saiu do pipeline. Voltam em v0.2 quando
+# rehabilitarmos a feature opt-in.
 
 
 # ============================================================
@@ -387,8 +329,15 @@ async def test_pipeline_persists_with_warnings_after_max_regens(
     tmp_path,
 ) -> None:
     """
-    Mesmo após max_regen_attempts, ata é persistida com
-    validation_passed=False — usuário vê warning, não é bloqueado.
+    Mesmo após max_regen_attempts com items sempre inválidos, o pipeline
+    completa — o PURGE (Fase 1.13) remove deterministicamente os items
+    com evidence inválida e a ata é persistida sem eles.
+
+    Resultado esperado:
+    - status="completed"
+    - O item inválido foi PURGADO (action_items vazio na DB)
+    - validation_passed=True porque depois do purge não há mais items
+      problemáticos
     """
     _patch_audio_pipeline(monkeypatch, tmp_path)
     _patch_settings_processed_dir(monkeypatch, tmp_path)
@@ -406,7 +355,7 @@ async def test_pipeline_persists_with_warnings_after_max_regens(
             ],
         }
     )
-    # 3 chamadas (1 inicial + 2 regens) — todas devolvem inválido
+    # 3 chamadas (1 inicial + 2 regens) — todas devolvem o mesmo inválido
     fake_llm = _FakeLLMProvider([invalid_payload] * 3)
     llm_router = LLMRouter({"fake": fake_llm})
     tx_router = TranscriptionRouter([_FakeTxProvider(full_text="texto qualquer")])
@@ -421,11 +370,12 @@ async def test_pipeline_persists_with_warnings_after_max_regens(
 
     async with session_factory() as db:
         m = await db.get(Meeting, meeting_row.id)
-        assert m.status == "completed"  # COMPLETED mesmo com warnings
-        minutes = (await db.execute(select(Minutes))).scalar_one()
-        assert minutes.validation_passed is False
-        assert minutes.validation_issues is not None
-        assert len(minutes.validation_issues) == 1
+        assert m.status == "completed"
+        minutes_res = await db.execute(select(Minutes))
+        minutes = minutes_res.scalar_one()
+        # PURGE removeu o action_item inválido → action_items na ata fica vazio
+        # → validation_passed=True (não há mais nada pra validar falhar)
+        assert minutes.validation_passed is True
 
     assert fake_llm.call_count == 3
 

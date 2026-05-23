@@ -20,7 +20,6 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from app.api.diagnostics import router as diagnostics_router
@@ -99,9 +98,12 @@ def create_app() -> FastAPI:
             },
         )
 
-    # Middleware aplica default_limits a TODOS os endpoints (defesa global).
-    # Endpoints específicos podem ter limits adicionais via @limiter.limit()
-    app.add_middleware(SlowAPIMiddleware)
+    # NOTA: SlowAPIMiddleware global desabilitado — exige `request: Request`
+    # no signature de TODOS os endpoints (api breaking pra MVP). O limiter
+    # continua disponível em app.state.limiter pra uso via decorator em
+    # endpoints específicos: @limiter.limit("5/minute") (precisa request param).
+    # Rate limiting global volta na v0.2 após refactor dos endpoints.
+    # app.add_middleware(SlowAPIMiddleware)
 
     # CORS — Tauri webview no Windows usa schemes variados
     # (http://tauri.localhost, https://tauri.localhost, tauri://localhost,

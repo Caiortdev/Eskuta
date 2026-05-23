@@ -57,11 +57,13 @@ silero-vad==5.1.2
 groq==1.2.0
 assemblyai==0.64.3
 
-# --- Camada de diarização (Etapa 1.5) ---
-# pyannote.audio: identifica QUEM falou quando. Modelo "speaker-diarization-3.1"
-# (~500MB) baixa do Hugging Face Hub na primeira execução — precisa HF_TOKEN.
-# Versão 4.0.4 (não 3.3.2 do relatório) por compat com torchaudio 2.11+.
-pyannote.audio==4.0.4
+# --- Camada de diarização (REMOVIDA em v0.1) ---
+# pyannote.audio + torch + speechbrain pesam ~1GB no bundle e leva 5-10min
+# em CPU pra diarizar reunião de 20min. Tiramos pra MVP leve (200MB total,
+# roda em qualquer máquina). Plano v0.2: voltar como opt-in via AssemblyAI
+# (cloud) ou download sob demanda do pyannote pra quem tem GPU.
+# Código de integração permanece em app.services.diarization, isolado.
+# pyannote.audio==4.0.4  # rehabilitar quando v0.2 sair
 
 # --- Camada de LLM (Etapa 1.6) ---
 # 3 SDKs oficiais — usuário escolhe qual usar plugando a key dele.

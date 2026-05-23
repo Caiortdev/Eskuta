@@ -22,6 +22,7 @@ Preços (USD/1M tokens, jan/2026 — revisar trimestralmente):
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import Any, Final
 
@@ -41,6 +42,31 @@ from app.services.llm.base import (
 GEMINI_MODEL: Final[str] = "gemini-2.5-flash"
 GEMINI_INPUT_PER_MTOK: Final[float] = 0.075
 GEMINI_OUTPUT_PER_MTOK: Final[float] = 0.30
+
+# Regex pra extrair "Please retry in 6.423179713s" da mensagem de erro 429
+# do Gemini. O free tier limita a 5 req/min pro modelo flash.
+_RETRY_AFTER_RE: Final[re.Pattern[str]] = re.compile(
+    r"retry in (\d+(?:\.\d+)?)\s*s",
+    re.IGNORECASE,
+)
+
+
+def _extract_retry_after_sec(exc: Exception) -> float | None:
+    """
+    Extrai retry_after em segundos do erro 429 do Gemini. A API devolve
+    em DOIS lugares — tentamos ambos:
+    1. String "Please retry in 6.4s" na mensagem
+    2. Field `details.retryDelay` (formato "6s") — mais difícil de
+       parsear sem acessar campos privados do SDK
+    """
+    msg = str(exc)
+    match = _RETRY_AFTER_RE.search(msg)
+    if match:
+        try:
+            return float(match.group(1))
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 class GeminiProvider(LLMProvider):
@@ -108,10 +134,20 @@ class GeminiProvider(LLMProvider):
             )
         except genai_errors.APIError as exc:
             msg = str(exc).lower()
-            if "rate" in msg and "limit" in msg:
+            # 429 e RESOURCE_EXHAUSTED são casos típicos de rate limit
+            # do free tier (5 req/min no gemini-2.5-flash). Tem "resource"
+            # ou "quota" se for rate, então cobrimos vários jeitos.
+            is_rate = (
+                ("rate" in msg and "limit" in msg)
+                or "resource_exhausted" in msg
+                or "quota exceeded" in msg
+                or "429" in msg
+            )
+            if is_rate:
                 raise LLMRateLimitError(
                     "Gemini rate limit excedido",
                     provider="gemini",
+                    retry_after_sec=_extract_retry_after_sec(exc),
                 ) from exc
             if "timeout" in msg or "deadline" in msg:
                 raise LLMTimeoutError(

@@ -216,6 +216,46 @@ def plan_chunks(
     return chunks
 
 
+def _extract_one_chunk(
+    audio_path: Path,
+    chunk: AudioChunk,
+    output_dir: Path,
+    *,
+    sample_rate: int,
+    bitrate: str,
+) -> AudioChunk:
+    """Extrai 1 chunk via ffmpeg. Pensado pra rodar em ThreadPoolExecutor."""
+    import ffmpeg
+
+    # Reusa o resolver do converter — em dev/prod usa imageio_ffmpeg
+    # embutido. Sem passar cmd=, ffmpeg-python tenta `ffmpeg` do PATH
+    # e dá WinError 2 quando o user não tem ffmpeg instalado no sistema.
+    from app.services.audio.converter import _ffmpeg_exe
+
+    out_path = output_dir / f"{audio_path.stem}_chunk_{chunk.index:03d}.mp3"
+    (
+        ffmpeg.input(str(audio_path), ss=chunk.start_sec, to=chunk.end_sec)
+        .output(
+            str(out_path),
+            format="mp3",
+            acodec="libmp3lame",
+            ac=1,
+            ar=sample_rate,
+            audio_bitrate=bitrate,
+            loglevel="error",
+        )
+        .overwrite_output()
+        .run(cmd=_ffmpeg_exe(), capture_stdout=True, capture_stderr=True)
+    )
+    return AudioChunk(
+        index=chunk.index,
+        start_sec=chunk.start_sec,
+        end_sec=chunk.end_sec,
+        segment_count=chunk.segment_count,
+        file_path=out_path,
+    )
+
+
 def chunk_audio_smart(
     audio_path: Path,
     speech_segments: list[SpeechSegment],
@@ -225,12 +265,21 @@ def chunk_audio_smart(
     snap_max_delta_sec: float = DEFAULT_SNAP_MAX_DELTA_SEC,
     sample_rate: int = 16000,
     bitrate: str = "32k",
+    max_workers: int | None = None,
 ) -> list[AudioChunk]:
     """
     Planeja chunks via `plan_chunks` e materializa cada um como MP3
     em `output_dir`. Retorna os chunks com `file_path` preenchido.
 
     Cada arquivo segue o padrão `{audio_path.stem}_chunk_{index}.mp3`.
+
+    **Paralelização (Fase 1.13.B/C3):** extrai N chunks em paralelo via
+    ThreadPoolExecutor. Cada ffmpeg.run abre um subprocess separado, então
+    paralelismo aproveita múltiplos cores. Pra reunião de 3h (~18 chunks),
+    cai de ~27s pra ~7s.
+
+    `max_workers` default usa `settings.MAX_PARALLEL_CHUNKS` (ou 4 se falhar
+    o import — fallback defensivo pra testes).
     """
     if not audio_path.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {audio_path}")
@@ -242,35 +291,39 @@ def chunk_audio_smart(
         snap_max_delta_sec=snap_max_delta_sec,
     )
 
-    # Import lazy do ffmpeg pra que `plan_chunks` continue testável sem o
-    # binário instalado.
-    import ffmpeg
+    if not plan:
+        return []
 
-    materialized: list[AudioChunk] = []
-    for chunk in plan:
-        out_path = output_dir / f"{audio_path.stem}_chunk_{chunk.index:03d}.mp3"
-        (
-            ffmpeg.input(str(audio_path), ss=chunk.start_sec, to=chunk.end_sec)
-            .output(
-                str(out_path),
-                format="mp3",
-                acodec="libmp3lame",
-                ac=1,
-                ar=sample_rate,
-                audio_bitrate=bitrate,
-                loglevel="error",
-            )
-            .overwrite_output()
-            .run(capture_stdout=True, capture_stderr=True)
-        )
-        materialized.append(
-            AudioChunk(
-                index=chunk.index,
-                start_sec=chunk.start_sec,
-                end_sec=chunk.end_sec,
-                segment_count=chunk.segment_count,
-                file_path=out_path,
-            )
-        )
+    # Resolve max_workers — default = MAX_PARALLEL_CHUNKS do settings.
+    if max_workers is None:
+        try:
+            from app.core.settings import settings as _settings
 
+            max_workers = max(1, _settings.MAX_PARALLEL_CHUNKS)
+        except Exception:
+            max_workers = 4
+
+    # ThreadPoolExecutor — cada thread despacha ffmpeg subprocess (CPU
+    # bound do ffmpeg fica fora do GIL).
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        # Submit preservando ordem do plan (vai retornar tasks na ordem
+        # de submit, mas cada uma resolve no seu tempo).
+        futures = [
+            pool.submit(
+                _extract_one_chunk,
+                audio_path,
+                chunk,
+                output_dir,
+                sample_rate=sample_rate,
+                bitrate=bitrate,
+            )
+            for chunk in plan
+        ]
+        materialized = [f.result() for f in futures]
+
+    # Reordena por índice (defesa em profundidade — futures.result()
+    # já deveria preservar ordem, mas garante invariante do contrato).
+    materialized.sort(key=lambda c: c.index)
     return materialized

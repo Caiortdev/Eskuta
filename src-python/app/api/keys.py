@@ -42,7 +42,7 @@ class ProviderStatus(BaseModel):
     provider: str
     is_configured: bool
     last_validated_at: datetime | None = None
-    last_validation_status: Literal["success", "failed", "invalid"] | None = None
+    last_validation_status: Literal["valid", "invalid", "error"] | None = None
     notes: str | None = None
 
 

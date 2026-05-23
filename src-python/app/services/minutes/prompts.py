@@ -157,6 +157,17 @@ Você recebe a TRANSCRIÇÃO BRUTA de uma reunião e produz uma ATA ESTRUTURADA 
    - Decisão: algo que foi resolvido na reunião ("Aprovamos o orçamento X")
    - Action item: algo que ALGUÉM precisa fazer DEPOIS da reunião ("João vai falar com o cliente")
 
+7. **IGNORE METACONTEÚDO DE PODCAST/PROGRAMA.** A transcrição pode incluir trechos que NÃO fazem parte da reunião/conversa principal — IGNORE COMPLETAMENTE estes elementos (não viram tópicos, decisões ou ações):
+   - Anúncios/propagandas de patrocinador (ex: "A Hashtag Treinamentos oferece...", "use o cupom...", links/QR codes de desconto)
+   - Vinhetas, jingles, abertura/encerramento do programa
+   - Saudações genéricas ("fala galera", "sejam bem-vindos", "até a próxima")
+   - Auto-promoção do canal/host ("se inscreva", "deixe seu like")
+   - Apresentação do programa/episódio em si
+
+   APENAS o conteúdo discursivo/substantivo da reunião vira ata. Se a transcrição inteira for só metaconteúdo (raro), retorne listas vazias.
+
+8. **NÃO COPIE DADOS DO EXEMPLO DIDÁTICO ABAIXO.** O bloco "EXEMPLO DE RESPOSTA BOA" mostra apenas o FORMATO esperado. Os nomes (ex: João, Maria), projetos (ex: Alpha), valores e ações do exemplo NÃO devem aparecer na sua resposta a menos que ESTEJAM LITERALMENTE na transcrição que você recebeu. Trate o exemplo como ilustração de schema, não como fonte de conteúdo.
+
 # PROCESSO MENTAL (faça nesta ordem)
 
 Antes de produzir a resposta, raciocine:
@@ -213,16 +224,33 @@ Responda APENAS com JSON válido seguindo este schema:
 }}
 ```
 
-# EXEMPLO DE RESPOSTA BOA
+# =============================================================
+# EXEMPLO DIDÁTICO — APENAS PRA ILUSTRAR FORMATO
+# =============================================================
+# ⚠️ ATENÇÃO: tudo entre as marcações <EXEMPLO_DIDATICO> e
+# </EXEMPLO_DIDATICO> abaixo é DADO FICTÍCIO usado SÓ pra demonstrar
+# o schema. NUNCA copie nomes (João, Maria), nem o "Projeto Alpha",
+# nem orçamentos, nem decisões deste exemplo na sua resposta real.
+# Sua resposta DEVE ser construída inteiramente a partir da
+# transcrição enviada no user prompt, não deste exemplo.
 
-Transcrição (entrada):
+<EXEMPLO_DIDATICO>
+
+Transcrição de exemplo (entrada fictícia):
 "{FEW_SHOT_EXAMPLE_TRANSCRIPT}"
 
-Resposta (saída):
+Resposta esperada (saída fictícia, formato de referência):
 
 ```json
 {_format_example_minutes_json()}
 ```
+
+</EXEMPLO_DIDATICO>
+
+⚠️ Lembrete: os nomes "João" / "Maria" / "Projeto Alpha" / "15 mil" /
+"diretor" / "cliente" etc. acima são FICTÍCIOS. Eles SÓ devem aparecer
+na sua resposta SE estiverem LITERALMENTE na transcrição do user.
+Em caso de dúvida, NÃO inclua.
 
 # ANTI-EXEMPLO (NUNCA FAÇA ISSO)
 

@@ -19,6 +19,7 @@ from app.services.minutes.validator import (
     DEFAULT_FUZZY_THRESHOLD,
     EvidenceProblem,
     ValidationReport,
+    purge_invalid_items,
     validate_evidence,
     validate_minutes,
 )
@@ -309,3 +310,91 @@ def test_validate_minutes_no_log_when_valid(loguru_messages: list[str]) -> None:
     # Log de warning não deveria aparecer quando ata está limpa
     combined = "\n".join(loguru_messages)
     assert "problemas" not in combined
+
+
+# ============================================================
+# purge_invalid_items — última defesa anti-alucinação
+# ============================================================
+
+
+def test_purge_keeps_only_valid_items() -> None:
+    """Items com evidence inválida são REMOVIDOS, items válidos ficam."""
+    m = _minutes(
+        topics=[
+            Topic(title="Valido", summary="ok", evidence=_evidence("projeto Alpha")),
+            Topic(title="Inventado", summary="nope", evidence=_evidence("nada disso")),
+        ],
+        decisions=[
+            Decision(description="OK", evidence=_evidence("eu falo com ele até sexta")),
+            Decision(description="Hallucinated", evidence=_evidence("xyz fake")),
+        ],
+        action_items=[
+            ActionItem(description="OK", evidence=_evidence("Eu mando email pra ele hoje")),
+            ActionItem(description="Fake", evidence=_evidence("aaaa zzzzz")),
+        ],
+    )
+    purged, report = purge_invalid_items(m, TRANSCRIPT)
+    assert len(purged.topics) == 1 and purged.topics[0].title == "Valido"
+    assert len(purged.decisions) == 1 and purged.decisions[0].description == "OK"
+    assert len(purged.action_items) == 1 and purged.action_items[0].description == "OK"
+    assert report.removed_topics == 1
+    assert report.removed_decisions == 1
+    assert report.removed_action_items == 1
+    assert report.total_removed == 3
+
+
+def test_purge_no_op_when_all_valid() -> None:
+    m = _minutes(
+        action_items=[
+            ActionItem(description="OK", evidence=_evidence("eu falo com ele até sexta")),
+        ],
+    )
+    purged, report = purge_invalid_items(m, TRANSCRIPT)
+    assert len(purged.action_items) == 1
+    assert report.total_removed == 0
+
+
+def test_purge_preserves_other_fields() -> None:
+    """title, executive_summary, participants, open_questions ficam intactos."""
+    m = _minutes()
+    m_dict = m.model_dump()
+    m_dict["title"] = "Reunião importante"
+    m_dict["executive_summary"] = "Resumo da reunião."
+    m_dict["participants"] = ["João", "Maria"]
+    m_dict["open_questions"] = ["Sobrou X?"]
+    m = MinutesOutput.model_validate(m_dict)
+
+    purged, _ = purge_invalid_items(m, TRANSCRIPT)
+    assert purged.title == "Reunião importante"
+    assert purged.executive_summary == "Resumo da reunião."
+    assert purged.participants == ["João", "Maria"]
+    assert purged.open_questions == ["Sobrou X?"]
+
+
+def test_purge_removes_few_shot_leak_scenario() -> None:
+    """
+    Cenário REAL que motivou o purge: o LLM vazou o exemplo do few-shot
+    numa reunião que NÃO menciona Projeto Alpha. O purge tem que remover.
+    """
+    real_transcript = (
+        "Renan: A gente precisa discutir o plano de governo. "
+        "Junior: Concordo, prioridade é segurança pública."
+    )
+    m = _minutes(
+        decisions=[
+            # Item LEGÍTIMO da reunião
+            Decision(
+                description="Foco em segurança pública",
+                evidence=_evidence("prioridade é segurança pública"),
+            ),
+            # Item LEAKED do few-shot
+            Decision(
+                description="Adiar o projeto Alpha para a próxima sprint",
+                evidence=_evidence("eu acho que a gente deveria adiar pra próxima sprint"),
+            ),
+        ],
+    )
+    purged, report = purge_invalid_items(m, real_transcript)
+    assert len(purged.decisions) == 1
+    assert purged.decisions[0].description == "Foco em segurança pública"
+    assert report.removed_decisions == 1

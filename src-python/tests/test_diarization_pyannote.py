@@ -4,6 +4,11 @@ Testes do serviço pyannote (app.services.diarization.pyannote_service).
 Mockamos `pyannote.audio.Pipeline` pra não baixar modelo de ~500MB nem
 precisar de HF_TOKEN real. O singleton é resetado antes de cada teste
 pra que o estado de um não vaze pra outro.
+
+Mocks adicionais necessários após Fase 1.13:
+- `_load_audio_for_pyannote`: evita rodar ffmpeg em arquivo vazio (o
+  service agora pré-carrega áudio em memória pra contornar torchcodec).
+- `_detect_device`: evita inicializar torch CUDA detection nos testes.
 """
 
 from __future__ import annotations
@@ -32,6 +37,20 @@ def _reset_pipeline():
     reset_pipeline_cache()
 
 
+@pytest.fixture(autouse=True)
+def _mock_audio_and_device(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """
+    Substitui os helpers que tocam disco/hardware:
+    - `_load_audio_for_pyannote`: devolve dict mock sem rodar ffmpeg.
+    - `_detect_device`: devolve None (sem CUDA detection real).
+    Retorna o dict simulado pros testes que querem assertar.
+    """
+    fake_input = {"waveform": "fake-wav", "sample_rate": 16000}
+    monkeypatch.setattr(svc, "_load_audio_for_pyannote", lambda _path: fake_input)
+    monkeypatch.setattr(svc, "_detect_device", lambda: None)
+    return fake_input
+
+
 def _audio_file(tmp_path: Path) -> Path:
     f = tmp_path / "audio.mp3"
     f.write_bytes(b"")
@@ -47,10 +66,31 @@ def _make_track(start: float, end: float, speaker: str) -> tuple:
 
 
 def _make_pipeline_return(tracks: list[tuple]) -> MagicMock:
-    """Pipeline callable retorna Annotation com .itertracks(yield_label=True)."""
-    annotation = MagicMock()
+    """
+    Pipeline callable retorna Annotation com `.itertracks(yield_label=True)`.
+
+    Usamos `spec=["itertracks"]` pra que `hasattr(annotation, "exclusive_speaker_diarization")`
+    e `hasattr(annotation, "speaker_diarization")` retornem False — simula
+    pyannote 3.x onde o pipeline retorna Annotation direto, sem o wrapper
+    DiarizeOutput do 4.x. Sem o spec, MagicMock criaria esses attrs sob
+    demanda e o branch errado seria escolhido.
+    """
+    annotation = MagicMock(spec=["itertracks"])
     annotation.itertracks.return_value = iter(tracks)
     return annotation
+
+
+def _make_pipeline_callable(tracks: list[tuple]) -> MagicMock:
+    """
+    Cria mock do Pipeline com:
+    - `__call__(audio_input)` → Annotation com `tracks`
+    - `.to(device)` → retorna self (importante: senão o singleton fica
+      apontando pro retorno do `.to()`, não pro pipeline original).
+    """
+    pipeline = MagicMock()
+    pipeline.return_value = _make_pipeline_return(tracks)
+    pipeline.to = MagicMock(return_value=pipeline)
+    return pipeline
 
 
 # ============================================================
@@ -127,7 +167,7 @@ def test_diarize_returns_segments_sorted_by_start(
         _make_track(0.0, 2.0, "SPEAKER_00"),
         _make_track(2.5, 4.0, "SPEAKER_00"),
     ]
-    pipeline_callable = MagicMock(return_value=_make_pipeline_return(tracks))
+    pipeline_callable = _make_pipeline_callable(tracks)
 
     with patch(
         "pyannote.audio.Pipeline.from_pretrained",
@@ -140,13 +180,18 @@ def test_diarize_returns_segments_sorted_by_start(
     assert segments[2].speaker_id == "SPEAKER_01"
 
 
-def test_diarize_calls_pipeline_with_audio_path_string(
+def test_diarize_calls_pipeline_with_inmemory_audio(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    _mock_audio_and_device: dict,
 ) -> None:
+    """
+    Após Fase 1.13, passamos `{'waveform': tensor, 'sample_rate': int}`
+    em vez de str(path) — contorno do torchcodec quebrado.
+    """
     monkeypatch.setattr(svc.settings, "HF_TOKEN", "hf_xxx")
     audio = _audio_file(tmp_path)
-    pipeline_callable = MagicMock(return_value=_make_pipeline_return([]))
+    pipeline_callable = _make_pipeline_callable([])
 
     with patch(
         "pyannote.audio.Pipeline.from_pretrained",
@@ -154,7 +199,7 @@ def test_diarize_calls_pipeline_with_audio_path_string(
     ):
         diarize(audio)
 
-    pipeline_callable.assert_called_once_with(str(audio))
+    pipeline_callable.assert_called_once_with(_mock_audio_and_device)
 
 
 def test_diarize_empty_returns_empty(
@@ -163,7 +208,7 @@ def test_diarize_empty_returns_empty(
 ) -> None:
     monkeypatch.setattr(svc.settings, "HF_TOKEN", "hf_xxx")
     audio = _audio_file(tmp_path)
-    pipeline_callable = MagicMock(return_value=_make_pipeline_return([]))
+    pipeline_callable = _make_pipeline_callable([])
 
     with patch(
         "pyannote.audio.Pipeline.from_pretrained",
@@ -184,7 +229,7 @@ def test_diarize_log_includes_unique_speaker_count(
         _make_track(1.0, 2.0, "SPEAKER_01"),
         _make_track(2.0, 3.0, "SPEAKER_00"),
     ]
-    pipeline_callable = MagicMock(return_value=_make_pipeline_return(tracks))
+    pipeline_callable = _make_pipeline_callable(tracks)
 
     with patch(
         "pyannote.audio.Pipeline.from_pretrained",
@@ -209,7 +254,7 @@ def test_pipeline_loaded_only_once_across_calls(
 ) -> None:
     monkeypatch.setattr(svc.settings, "HF_TOKEN", "hf_xxx")
     audio = _audio_file(tmp_path)
-    pipeline_callable = MagicMock(return_value=_make_pipeline_return([]))
+    pipeline_callable = _make_pipeline_callable([])
 
     with patch(
         "pyannote.audio.Pipeline.from_pretrained",
@@ -228,7 +273,7 @@ def test_reset_pipeline_cache_forces_reload(
 ) -> None:
     monkeypatch.setattr(svc.settings, "HF_TOKEN", "hf_xxx")
     audio = _audio_file(tmp_path)
-    pipeline_callable = MagicMock(return_value=_make_pipeline_return([]))
+    pipeline_callable = _make_pipeline_callable([])
 
     with patch(
         "pyannote.audio.Pipeline.from_pretrained",
@@ -247,7 +292,7 @@ def test_pipeline_passes_token_to_from_pretrained(
 ) -> None:
     monkeypatch.setattr(svc.settings, "HF_TOKEN", "hf_secret_token")
     audio = _audio_file(tmp_path)
-    pipeline_callable = MagicMock(return_value=_make_pipeline_return([]))
+    pipeline_callable = _make_pipeline_callable([])
 
     with patch(
         "pyannote.audio.Pipeline.from_pretrained",
@@ -255,9 +300,12 @@ def test_pipeline_passes_token_to_from_pretrained(
     ) as load_mock:
         diarize(audio)
 
+    # Pyannote 4.x usa kwarg `token`; o fallback `use_auth_token` só
+    # dispara se o `token=` der TypeError. Como o mock aceita tudo,
+    # o primeiro caminho passa.
     load_mock.assert_called_once_with(
         PYANNOTE_MODEL,
-        use_auth_token="hf_secret_token",
+        token="hf_secret_token",
     )
 
 
@@ -289,7 +337,8 @@ def test_diarize_runtime_failure_raises_diarization_error(
 ) -> None:
     monkeypatch.setattr(svc.settings, "HF_TOKEN", "hf_xxx")
     audio = _audio_file(tmp_path)
-    pipeline_callable = MagicMock(side_effect=RuntimeError("CUDA OOM"))
+    pipeline_callable = _make_pipeline_callable([])
+    pipeline_callable.side_effect = RuntimeError("CUDA OOM")
 
     with (
         patch(
@@ -311,7 +360,7 @@ def test_diarize_log_does_not_leak_hf_token(
     secret = "hf_super_secret_token_dont_leak"
     monkeypatch.setattr(svc.settings, "HF_TOKEN", secret)
     audio = _audio_file(tmp_path)
-    pipeline_callable = MagicMock(return_value=_make_pipeline_return([]))
+    pipeline_callable = _make_pipeline_callable([])
 
     with patch(
         "pyannote.audio.Pipeline.from_pretrained",

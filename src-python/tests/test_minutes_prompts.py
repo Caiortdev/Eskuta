@@ -125,10 +125,11 @@ def test_system_prompt_emphasizes_truthfulness_over_completeness() -> None:
 
 def test_system_prompt_example_json_is_valid_json() -> None:
     """O JSON do few-shot embutido no prompt deve ser sintaticamente válido."""
-    # Extrai o bloco entre o primeiro ```json após "Resposta (saída)" e o próximo ```
-    marker = "Resposta (saída):"
+    # Após Fase 1.13 o marker virou "Resposta esperada" (com aviso de
+    # "não copie") em vez de "Resposta (saída)".
+    marker = "Resposta esperada"
     start = SYSTEM_PROMPT_MINUTES.find(marker)
-    assert start != -1
+    assert start != -1, "marker do exemplo não encontrado no system prompt"
     json_start = SYSTEM_PROMPT_MINUTES.find("```json", start) + len("```json")
     json_end = SYSTEM_PROMPT_MINUTES.find("```", json_start)
     payload = SYSTEM_PROMPT_MINUTES[json_start:json_end].strip()
