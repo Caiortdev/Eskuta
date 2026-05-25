@@ -48,6 +48,10 @@ imageio-ffmpeg==0.5.1
 
 # ffmpeg-python: wrapper Python sobre o binário ffmpeg (precisa estar no PATH).
 # silero-vad: modelo leve de Voice Activity Detection (~30MB do torch.hub).
+# Versão 5.1.2 (com compat shim em app/services/audio/vad.py) — a 6.x
+# passou a usar `torchcodec` que tem DLL nativa quebrada no Windows. A 5.x
+# chama `torchaudio.list_audio_backends()` removida em torchaudio 2.7+ —
+# resolvemos isso com monkey-patch único em vad.py antes do import lazy.
 ffmpeg-python==0.2.0
 silero-vad==5.1.2
 

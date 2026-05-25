@@ -65,6 +65,44 @@ def reset_model_cache() -> None:
         _model = None
 
 
+def _read_audio_ffmpeg(audio_path: Path, sampling_rate: int) -> Any:
+    """
+    Decodifica `audio_path` (qualquer formato suportado pelo ffmpeg) para
+    um torch.Tensor 1-D float32 normalizado em [-1, 1] no `sampling_rate`
+    pedido.
+
+    Usado em vez de `silero_vad.read_audio` / `torchaudio.load` porque:
+    - silero-vad 5.1.2 chama `torchaudio.list_audio_backends()` (removida em
+      torchaudio 2.7+; pyannote.audio 4.x exige torchaudio 2.11+).
+    - silero-vad 6.x usa `torchcodec`, cuja DLL nativa não carrega no Windows
+      (`libtorchcodec_core4.dll`).
+    - Bypassamos torchaudio totalmente: o ffmpeg já está no PATH como dep
+      do projeto desde a Etapa 0.1.
+    """
+    import ffmpeg
+    import numpy as np
+    import torch
+
+    # Pipe de PCM 16-bit signed little-endian (s16le): formato bruto,
+    # determinístico, sem header. Convertemos pra mono no sample rate alvo.
+    out, _ = (
+        ffmpeg.input(str(audio_path))
+        .output(
+            "pipe:",
+            format="s16le",
+            acodec="pcm_s16le",
+            ac=1,
+            ar=sampling_rate,
+            loglevel="error",
+        )
+        .run(capture_stdout=True, capture_stderr=True)
+    )
+    samples_int16 = np.frombuffer(out, dtype=np.int16)
+    # Normaliza pra [-1, 1] em float32 (range esperado pelo modelo Silero).
+    samples_float = samples_int16.astype(np.float32) / 32768.0
+    return torch.from_numpy(samples_float)
+
+
 def detect_speech_segments(
     audio_path: Path,
     *,
@@ -73,21 +111,18 @@ def detect_speech_segments(
     threshold: float = DEFAULT_THRESHOLD,
 ) -> list[SpeechSegment]:
     """
-    Detecta trechos de fala em `audio_path` (precisa estar em 16kHz mono;
-    use `convert_to_optimized_mp3` antes pra garantir).
+    Detecta trechos de fala em `audio_path` (qualquer formato suportado pelo
+    ffmpeg — não precisa estar pré-convertido).
 
     Retorna lista de `SpeechSegment` ordenada por `start_sec`.
     """
     if not audio_path.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {audio_path}")
 
-    from silero_vad import (
-        get_speech_timestamps,
-        read_audio,
-    )
+    from silero_vad import get_speech_timestamps
 
     model = _get_model()
-    wav = read_audio(str(audio_path), sampling_rate=SILERO_SAMPLE_RATE)
+    wav = _read_audio_ffmpeg(audio_path, sampling_rate=SILERO_SAMPLE_RATE)
 
     raw_timestamps = get_speech_timestamps(
         wav,
