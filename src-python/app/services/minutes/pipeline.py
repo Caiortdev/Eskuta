@@ -30,6 +30,7 @@ Decisões de design:
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -44,9 +45,6 @@ from app.models import Meeting
 from app.services.audio.chunker import chunk_audio_smart
 from app.services.audio.converter import convert_to_optimized_mp3_async
 from app.services.audio.vad import detect_speech_segments
-from app.services.diarization import is_available as diarization_is_available
-from app.services.diarization import merge_transcription_and_diarization
-from app.services.diarization.pyannote_service import diarize
 from app.services.llm.router import LLMRouter
 from app.services.minutes.generator import (
     GenerationResult,
@@ -54,22 +52,23 @@ from app.services.minutes.generator import (
     regenerate_with_correction,
 )
 from app.services.minutes.persister import save_minutes, save_transcript
-from app.services.minutes.validator import validate_minutes
-from app.services.transcription.base import TranscriptionResult
+from app.services.minutes.validator import purge_invalid_items, validate_minutes
 from app.services.transcription.parallel import (
     merge_chunk_transcriptions,
     transcribe_chunks_parallel,
 )
 from app.services.transcription.router import TranscriptionRouter
 
-# Lifecycle do status — UI mostra texto correspondente.
+# Lifecycle do status — UI mostra texto correspondente. "diarizing"
+# foi removido em v0.1 (diarização tirada do pipeline; manter o
+# valor como reservado pra v0.2 quando voltar opt-in).
 MEETING_STATUS_VALUES: Final[tuple[str, ...]] = (
     "pending",
     "converting",
     "detecting_speech",
     "chunking",
     "transcribing",
-    "diarizing",
+    "diarizing",  # reservado v0.2 (opt-in via AssemblyAI ou GPU local)
     "generating_minutes",
     "validating",
     "completed",
@@ -82,6 +81,12 @@ DEFAULT_MAX_REGEN_ATTEMPTS: Final[int] = 2  # Princípio do relatório §1.7.2
 SessionFactory = async_sessionmaker[AsyncSession]
 
 
+# Timeout global pra todo o pipeline. Reuniões longas de até ~4h devem
+# completar em 30min real time (chunks paralelos). Acima disso considera
+# patológico e aborta — meeting fica em failed.
+PIPELINE_TIMEOUT_SEC: int = 30 * 60
+
+
 async def process_meeting(
     meeting_id: str,
     *,
@@ -89,6 +94,7 @@ async def process_meeting(
     transcription_router: TranscriptionRouter | None = None,
     llm_router: LLMRouter | None = None,
     max_regen_attempts: int = DEFAULT_MAX_REGEN_ATTEMPTS,
+    timeout_sec: int = PIPELINE_TIMEOUT_SEC,
 ) -> None:
     """
     Pipeline completo. Carrega meeting do DB, processa, persiste,
@@ -101,6 +107,7 @@ async def process_meeting(
         transcription_router: router de STT; default usa `TranscriptionRouter()`.
         llm_router: router de LLM; default usa `LLMRouter()`.
         max_regen_attempts: regen pra validação falha (default 2 por relatório).
+        timeout_sec: tempo máximo total; após isso meeting vira failed.
     """
     factory: SessionFactory = session_factory or AsyncSessionLocal
     tx_router = transcription_router or TranscriptionRouter()
@@ -113,13 +120,24 @@ async def process_meeting(
             return
 
         try:
-            await _run_pipeline(
-                db=db,
-                meeting=meeting,
-                tx_router=tx_router,
-                llm_router=ll_router,
-                max_regen_attempts=max_regen_attempts,
+            await asyncio.wait_for(
+                _run_pipeline(
+                    db=db,
+                    meeting=meeting,
+                    tx_router=tx_router,
+                    llm_router=ll_router,
+                    max_regen_attempts=max_regen_attempts,
+                ),
+                timeout=timeout_sec,
             )
+        except TimeoutError:
+            logger.error(
+                "Pipeline excedeu timeout",
+                meeting_id=meeting_id,
+                timeout_sec=timeout_sec,
+            )
+            timeout_exc = TimeoutError(f"Pipeline excedeu {timeout_sec}s")
+            await _mark_failed(db, meeting, timeout_exc)
         except Exception as exc:
             logger.exception("Pipeline falhou", meeting_id=meeting_id)
             await _mark_failed(db, meeting, exc)
@@ -166,19 +184,23 @@ async def _run_pipeline(
     # ============================================================
     # Stage 4: Transcrição paralela
     # ============================================================
+    # Diarização (Stage 5 antigo) foi REMOVIDA do MVP v0.1 — pesa demais
+    # em CPU (pyannote leva ~5-10min sem GPU pra reunião de 20min) e
+    # adiciona ~1GB no bundle (torch + pyannote + speechbrain). Pra v0.2
+    # o plano é oferecer diarização via AssemblyAI (cloud, opt-in) ou
+    # download sob demanda do pyannote pra quem tem GPU. Código em
+    # app.services.diarization permanece pra reuso futuro.
     await _set_status(db, meeting, "transcribing")
+
     chunk_results = await transcribe_chunks_parallel(chunks, tx_router)
     transcription = merge_chunk_transcriptions(chunks, chunk_results)
     await save_transcript(db, meeting_id, transcription)
 
-    # ============================================================
-    # Stage 5: Diarização (opcional)
-    # ============================================================
-    await _set_status(db, meeting, "diarizing")
-    transcription_with_speakers = await _diarize_if_available(
-        transcription=transcription,
-        optimized_path=optimized_path,
-    )
+    # Sem diarização, os segments da transcrição não têm speaker_id —
+    # a ata vai sair sem rótulos "SPEAKER_00 disse X". Já é um fluxo
+    # válido e estável: a maior parte das atas curtas funciona sem
+    # diarização.
+    transcription_with_speakers = transcription
 
     # ============================================================
     # Stage 6: Geração da ata
@@ -189,13 +211,63 @@ async def _run_pipeline(
     # ============================================================
     # Stage 7: Validação cruzada (local) + regen
     # ============================================================
+    # Crítico: se o regen levantar ValidationError (JSON truncado após
+    # N tentativas), CAPTURAMOS e seguimos com a generation ORIGINAL
+    # — o PURGE da próxima fase vai limpar os items inválidos. Antes
+    # esse erro propagava → pipeline morria sem chance do purge agir.
     await _set_status(db, meeting, "validating")
-    generation, validation_report = await _validate_and_regen(
-        llm_router=llm_router,
-        transcript_text=transcription_with_speakers.full_text,
-        initial_generation=generation,
-        max_regen_attempts=max_regen_attempts,
+    from pydantic import ValidationError as _PydValidationError
+
+    try:
+        generation, validation_report = await _validate_and_regen(
+            llm_router=llm_router,
+            transcript_text=transcription_with_speakers.full_text,
+            initial_generation=generation,
+            max_regen_attempts=max_regen_attempts,
+        )
+    except _PydValidationError as exc:
+        logger.warning(
+            "Regen esgotou tentativas com JSON invalido — "
+            "seguindo com generation original (purge vai filtrar)",
+            error=str(exc)[:200],
+        )
+        # `generation` ainda aponta pra ata original (que parseou OK).
+        # Recalcula validation_report a partir dela.
+        validation_report = validate_minutes(
+            generation.minutes,
+            transcription_with_speakers.full_text,
+        )
+
+    # ============================================================
+    # Stage 7.5: PURGE determinístico (última linha de defesa anti-alucinação)
+    # ============================================================
+    # Se depois de N regens AINDA tem evidence inválida, o LLM esgotou
+    # as chances de corrigir. Em vez de persistir uma ata com items
+    # alucinados, REMOVEMOS deterministicamente os items inválidos.
+    # Garante que a ata final só contém itens cuja citação está
+    # auditavelmente no transcript.
+    purged_minutes, purge_report = purge_invalid_items(
+        generation.minutes,
+        transcription_with_speakers.full_text,
     )
+    if purge_report.total_removed > 0:
+        logger.info(
+            "Items removidos por purge",
+            removed_total=purge_report.total_removed,
+            topics=purge_report.removed_topics,
+            decisions=purge_report.removed_decisions,
+            actions=purge_report.removed_action_items,
+            kept_topics=len(purged_minutes.topics),
+            kept_decisions=len(purged_minutes.decisions),
+            kept_actions=len(purged_minutes.action_items),
+        )
+        # Recalcula validation_report já filtrado — agora is_valid=True
+        # (porque tudo que sobrou passa) E o report de problems mostra
+        # o que foi removido (pra UI alertar com transparência).
+        validation_report = validate_minutes(
+            purged_minutes,
+            transcription_with_speakers.full_text,
+        )
 
     # ============================================================
     # Stage 8: Persistir ata + marcar completed
@@ -203,7 +275,7 @@ async def _run_pipeline(
     await save_minutes(
         db=db,
         meeting_id=meeting_id,
-        minutes_output=generation.minutes,
+        minutes_output=purged_minutes,
         llm_response=generation.llm_response,
         validation_report=validation_report,
     )
@@ -212,6 +284,7 @@ async def _run_pipeline(
         "Pipeline concluído",
         meeting_id=meeting_id,
         validation_passed=validation_report.is_valid,
+        purged_count=purge_report.total_removed,
         total_cost_usd=round(transcription.cost_usd + generation.llm_response.cost_usd, 6),
     )
 
@@ -219,43 +292,6 @@ async def _run_pipeline(
 # ============================================================
 # Stage helpers
 # ============================================================
-
-
-async def _diarize_if_available(
-    *,
-    transcription: TranscriptionResult,
-    optimized_path: Path,
-) -> TranscriptionResult:
-    """
-    Roda pyannote.diarize se HF_TOKEN configurado; senão segue sem
-    rótulos de speaker (graceful skip — não bloqueia o pipeline).
-    """
-    if not diarization_is_available():
-        logger.info("Diarização indisponível (sem HF_TOKEN), pulando stage")
-        return transcription
-
-    try:
-        speaker_segments = await _to_thread(diarize, optimized_path)
-    except Exception as exc:
-        logger.warning(
-            "Diarização falhou — seguindo sem speaker labels",
-            error=str(exc),
-        )
-        return transcription
-
-    enriched = merge_transcription_and_diarization(
-        transcription.segments,
-        speaker_segments,
-    )
-    return TranscriptionResult(
-        full_text=transcription.full_text,
-        segments=enriched,
-        language=transcription.language,
-        duration_sec=transcription.duration_sec,
-        provider_used=transcription.provider_used,
-        model_used=transcription.model_used,
-        cost_usd=transcription.cost_usd,
-    )
 
 
 async def _validate_and_regen(

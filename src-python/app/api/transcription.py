@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.services.minutes.pipeline import process_meeting
 
-router = APIRouter(prefix="/transcribe", tags=["transcribe"])
+router = APIRouter(prefix="/api/transcribe", tags=["transcribe"])
 
 
 class StartTranscriptionRequest(BaseModel):

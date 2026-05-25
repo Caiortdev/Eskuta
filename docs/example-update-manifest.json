@@ -1,0 +1,12 @@
+{
+  "_comment": "Exemplo de manifesto JSON pra o tauri-plugin-updater. Sirva esse formato no endpoint configurado em tauri.conf.json -> plugins.updater.endpoints[0]. A signature é o conteúdo do arquivo .sig gerado pelo build assinado.",
+  "version": "0.1.1",
+  "notes": "- Fix: validação de API key agora persiste corretamente\n- UX: botão 'Salvar e testar' pré-valida antes de gravar no keyring\n- Build: pipeline unificado via scripts/build.ps1",
+  "pub_date": "2026-06-15T10:30:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUKzZUS3FaNGYzRGNFXC9Ic2lWejBQRGRmKzgvSDFjcm0wTGxlVEM3ZUlnPT0=",
+      "url": "https://eskuta-updates.example.com/releases/v0.1.1/Eskuta_0.1.1_x64-setup.exe"
+    }
+  }
+}

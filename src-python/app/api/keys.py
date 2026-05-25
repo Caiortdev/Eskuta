@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.base import utcnow
 from app.db.database import get_db
 from app.models import ApiKey, AuditLog
+from app.services import key_validator
 from app.services import keys as keys_service
 
 router = APIRouter(prefix="/api/keys", tags=["api-keys"])
@@ -41,7 +42,7 @@ class ProviderStatus(BaseModel):
     provider: str
     is_configured: bool
     last_validated_at: datetime | None = None
-    last_validation_status: Literal["success", "failed", "invalid"] | None = None
+    last_validation_status: Literal["valid", "invalid", "error"] | None = None
     notes: str | None = None
 
 
@@ -56,6 +57,30 @@ class SaveKeyRequest(BaseModel):
 class SimpleStatusResponse(BaseModel):
     provider: str
     is_configured: bool
+
+
+class TestKeyRequest(BaseModel):
+    """
+    Testar uma chave SEM persistir.
+
+    Se `key` é omitido, usa a chave atualmente salva no keyring (test
+    da configuração atual). Se fornecido, testa o valor novo antes de
+    salvar.
+    """
+
+    key: str | None = Field(
+        default=None,
+        max_length=2048,
+        description="Valor da chave a testar. Omita pra testar a chave já salva.",
+    )
+
+
+class TestKeyResponse(BaseModel):
+    provider: str
+    status: Literal["valid", "invalid", "error"]
+    message: str | None = None
+    http_status: int | None = None
+    latency_ms: int
 
 
 # ============================================================
@@ -172,3 +197,64 @@ async def delete_provider_key(
     logger.info("Provider removido", provider=valid)
 
     return SimpleStatusResponse(provider=valid, is_configured=False)
+
+
+@router.post("/{provider}/test", response_model=TestKeyResponse)
+async def test_provider_key(
+    provider: str,
+    body: TestKeyRequest,
+    db: DbSession,
+) -> TestKeyResponse:
+    """
+    Testa conectividade da chave do provider (chamada cheap GET /models).
+
+    Body com `key` preenchido testa o valor novo SEM salvar (use antes
+    de PUT). Body com `key=null` testa a chave já no keyring.
+
+    Resultado é persistido em `api_keys.last_validated_at` +
+    `last_validation_status` quando a chave estava no keyring.
+    Nunca persiste o valor da chave em si.
+    """
+    valid = _validate_provider_param(provider)
+
+    # Decidir qual chave testar
+    if body.key is not None and body.key.strip():
+        key_to_test = body.key.strip()
+        from_keyring = False
+    else:
+        stored = keys_service.get_api_key(valid)
+        if not stored:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"Nenhuma chave salva pra {valid}. "
+                    f"Envie 'key' no body pra testar um valor novo."
+                ),
+            )
+        key_to_test = stored
+        from_keyring = True
+
+    result = await key_validator.validate_api_key(valid, key_to_test)
+
+    # Persiste resultado SE a chave testada era a do keyring (test sem
+    # body=key). Se foi pré-validação de um valor novo, não toca no DB.
+    if from_keyring:
+        row = (
+            (await db.execute(select(ApiKey).where(ApiKey.provider == valid)))
+            .scalars()
+            .one_or_none()
+        )
+        if row is not None:
+            row.last_validated_at = utcnow()
+            row.last_validation_status = result.status
+            row.notes = result.message
+        await _log_audit(db, action="test_api_key", provider=valid)
+        await db.commit()
+
+    return TestKeyResponse(
+        provider=valid,
+        status=result.status,
+        message=result.message,
+        http_status=result.http_status,
+        latency_ms=result.latency_ms,
+    )

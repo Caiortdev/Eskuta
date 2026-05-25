@@ -28,9 +28,11 @@ def test_default_preferences() -> None:
 
 def test_default_limits() -> None:
     s = Settings()
-    assert s.MAX_AUDIO_MB == 500
+    assert s.MAX_AUDIO_MB == 5120  # 5 GB — cobre reuniões longas (1-3h)
     assert s.CHUNK_DURATION_SEC == 600
-    assert s.MAX_PARALLEL_CHUNKS == 4
+    # Fase 1.13/C4: 4 → 6. Groq pago aguenta 100+ req/min; AssemblyAI ainda
+    # mais. Em free tier, o 429 + retry com backoff segura o lado do provider.
+    assert s.MAX_PARALLEL_CHUNKS == 6
 
 
 def test_default_host_is_loopback() -> None:

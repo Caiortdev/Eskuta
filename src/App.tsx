@@ -9,10 +9,18 @@
  */
 
 import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
+import { UpdateChecker } from "@/components/UpdateChecker";
 import { Button } from "@/components/ui/button";
 import { ApiError, type HealthResponse, waitForSidecar } from "@/lib/api";
+import { useShortcuts } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { HomePage } from "@/pages/Home";
 import { MeetingDetailPage } from "@/pages/MeetingDetail";
@@ -51,6 +59,8 @@ function App() {
 
   return (
     <BrowserRouter>
+      <UpdateChecker />
+      <ShortcutsHost />
       <Routes>
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route element={<AppLayout />}>
@@ -66,6 +76,40 @@ function App() {
   );
 }
 
+function ShortcutsHost() {
+  const navigate = useNavigate();
+  useShortcuts([
+    {
+      key: "u",
+      mod: true,
+      description: "Ir pra Nova reunião",
+      handler: (e) => {
+        e.preventDefault();
+        navigate("/upload");
+      },
+    },
+    {
+      key: ",",
+      mod: true,
+      description: "Abrir Configurações",
+      handler: (e) => {
+        e.preventDefault();
+        navigate("/settings");
+      },
+    },
+    {
+      key: "h",
+      mod: true,
+      description: "Ir pra Início (Reuniões)",
+      handler: (e) => {
+        e.preventDefault();
+        navigate("/");
+      },
+    },
+  ]);
+  return null;
+}
+
 function SidecarGate({
   status,
 }: {
@@ -73,14 +117,41 @@ function SidecarGate({
 }) {
   const base =
     "min-h-screen flex items-center justify-center p-6 bg-background";
+
+  // Mostra mensagem progressiva — a primeira frase aparece imediato (sem
+  // delay), as outras só se a inicialização demorar muito.
+  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  useEffect(() => {
+    if (status.kind !== "starting") return;
+    const t = setInterval(() => setSecondsElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [status.kind]);
+
   if (status.kind === "starting") {
     return (
       <div className={base}>
-        <div className="text-center space-y-3">
-          <div className="size-3 mx-auto rounded-full bg-amber-500 animate-pulse" />
-          <p className="text-sm text-muted-foreground">
-            Aguardando sidecar Python subir…
-          </p>
+        <div className="text-center space-y-6 max-w-sm">
+          {/* Logo + spinner */}
+          <div className="flex flex-col items-center gap-4">
+            <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <span className="text-3xl">🎙️</span>
+            </div>
+            <div className="flex gap-1">
+              <div className="size-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+              <div className="size-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+              <div className="size-2 rounded-full bg-primary animate-bounce" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl font-semibold tracking-tight">Eskuta</h1>
+            <p className="text-sm text-muted-foreground">
+              {secondsElapsed < 4
+                ? "Iniciando…"
+                : secondsElapsed < 10
+                  ? "Preparando o motor de transcrição…"
+                  : "Quase lá, aguentando aí…"}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -94,11 +165,13 @@ function SidecarGate({
         )}
       >
         <h2 className="text-lg font-semibold text-destructive">
-          Sidecar não respondeu
+          Não consegui iniciar o Eskuta
         </h2>
         <p className="mt-2 text-sm text-destructive/80">{status.error}</p>
         <p className="mt-3 text-xs text-muted-foreground">
-          Verifique os logs em ~/.eskuta/logs/ ou reinicie o app.
+          Se o problema persistir, em{" "}
+          <strong>Configurações &gt; Diagnóstico</strong> exporte os logs e
+          envie pro suporte.
         </p>
         <Button
           variant="outline"

@@ -20,7 +20,7 @@ async def test_start_transcription_returns_processing(client: httpx.AsyncClient)
         new=AsyncMock(return_value=None),
     ):
         res = await client.post(
-            "/transcribe/start",
+            "/api/transcribe/start",
             json={"meeting_id": "abc123"},
         )
     assert res.status_code == 200
@@ -31,7 +31,7 @@ async def test_start_transcription_validates_empty_meeting_id(
     client: httpx.AsyncClient,
 ) -> None:
     res = await client.post(
-        "/transcribe/start",
+        "/api/transcribe/start",
         json={"meeting_id": ""},
     )
     assert res.status_code == 422
@@ -41,7 +41,7 @@ async def test_start_transcription_validates_missing_meeting_id(
     client: httpx.AsyncClient,
 ) -> None:
     res = await client.post(
-        "/transcribe/start",
+        "/api/transcribe/start",
         json={},
     )
     assert res.status_code == 422
@@ -56,7 +56,7 @@ async def test_start_transcription_schedules_process_meeting(
         new=AsyncMock(return_value=None),
     ) as mock_process:
         res = await client.post(
-            "/transcribe/start",
+            "/api/transcribe/start",
             json={"meeting_id": "meet-42"},
         )
     assert res.status_code == 200
@@ -69,7 +69,7 @@ async def test_start_transcription_validates_too_long_meeting_id(
     client: httpx.AsyncClient,
 ) -> None:
     res = await client.post(
-        "/transcribe/start",
+        "/api/transcribe/start",
         json={"meeting_id": "x" * 65},
     )
     assert res.status_code == 422

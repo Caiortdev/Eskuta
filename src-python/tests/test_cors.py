@@ -19,7 +19,11 @@ ALLOWED_ORIGINS = [
 REJECTED_ORIGINS = [
     "http://evil.com",
     "https://attacker.example",
-    "http://localhost:3000",  # porta diferente do Vite Tauri
+    # NOTA: http://localhost:3000 não está mais rejeitado — o regex
+    # passou a aceitar qualquer porta localhost (necessário pra Tauri
+    # webview que usa porta aleatória do WebView2 + Vite que pode mudar
+    # porta). Como o sidecar bind em 127.0.0.1, só processos da própria
+    # máquina alcançam — origem cruzada de outra máquina não chega aqui.
     "null",
 ]
 

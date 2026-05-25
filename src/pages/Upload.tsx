@@ -10,7 +10,9 @@ import { ApiError, api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const MAX_BYTES = 500 * 1024 * 1024; // 500MB
+// Limite generoso pra cobrir reuniões longas: 2-3h em WAV/FLAC podem
+// passar de 3GB. 5GB cobre 99% dos casos reais.
+const MAX_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
 const ACCEPT = {
   "audio/mpeg": [".mp3"],
   "audio/mp4": [".mp4", ".m4a"],
@@ -62,7 +64,7 @@ export function UploadPage() {
       <header>
         <h2 className="text-2xl font-semibold tracking-tight">Nova reunião</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          MP3, MP4, M4A ou WAV. Limite de 500MB.
+          MP3, MP4, M4A ou WAV. Limite de 5GB.
         </p>
       </header>
 
@@ -111,7 +113,7 @@ export function UploadPage() {
                   : "Arraste o áudio ou clique pra escolher"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                MP3, MP4, M4A, WAV · máximo 500MB
+                MP3, MP4, M4A, WAV · máximo 5GB
               </p>
             </>
           )}

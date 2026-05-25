@@ -150,3 +150,88 @@ def validate_minutes(
             threshold=threshold,
         )
     return report
+
+
+# ============================================================
+# Purge determinístico — última linha de defesa contra alucinação
+# ============================================================
+
+
+@dataclass(frozen=True)
+class PurgeReport:
+    """Resumo do que foi removido por evidência inválida."""
+
+    removed_topics: int = 0
+    removed_decisions: int = 0
+    removed_action_items: int = 0
+
+    @property
+    def total_removed(self) -> int:
+        return self.removed_topics + self.removed_decisions + self.removed_action_items
+
+
+def purge_invalid_items(
+    minutes: MinutesOutput,
+    transcript_text: str,
+    *,
+    threshold: int = DEFAULT_FUZZY_THRESHOLD,
+) -> tuple[MinutesOutput, PurgeReport]:
+    """
+    Remove de `minutes` todos os topics/decisions/action_items cuja
+    `evidence.quote` NÃO existe na transcrição (similarity < threshold).
+
+    Última camada de defesa contra alucinação — usada DEPOIS de o LLM
+    ter esgotado tentativas de regen. Garante que a ata persistida só
+    contém itens que podem ser AUDITADOS contra o transcript real.
+
+    Casos típicos pegados aqui:
+    - LLM vazou itens do FEW-SHOT EXAMPLE do system prompt
+      (ex: "Projeto Alpha" numa reunião que não tem isso)
+    - LLM parafraseou tanto que o quote não bate mais
+    - LLM inventou item baseado em "interpretação" do conteúdo
+
+    Retorna a ata filtrada + `PurgeReport` com quantos foram removidos
+    por categoria (pra log + UI mostrar alerta).
+    """
+    kept_topics = [
+        t
+        for t in minutes.topics
+        if validate_evidence(t.evidence.quote, transcript_text, threshold=threshold)
+    ]
+    kept_decisions = [
+        d
+        for d in minutes.decisions
+        if validate_evidence(d.evidence.quote, transcript_text, threshold=threshold)
+    ]
+    kept_actions = [
+        a
+        for a in minutes.action_items
+        if validate_evidence(a.evidence.quote, transcript_text, threshold=threshold)
+    ]
+
+    report = PurgeReport(
+        removed_topics=len(minutes.topics) - len(kept_topics),
+        removed_decisions=len(minutes.decisions) - len(kept_decisions),
+        removed_action_items=len(minutes.action_items) - len(kept_actions),
+    )
+
+    if report.total_removed > 0:
+        logger.warning(
+            "Purge removeu itens com evidence invalida (alucinacao detectada)",
+            removed_topics=report.removed_topics,
+            removed_decisions=report.removed_decisions,
+            removed_action_items=report.removed_action_items,
+            kept_topics=len(kept_topics),
+            kept_decisions=len(kept_decisions),
+            kept_actions=len(kept_actions),
+        )
+
+    # Cria ata nova preservando os demais campos
+    purged = minutes.model_copy(
+        update={
+            "topics": kept_topics,
+            "decisions": kept_decisions,
+            "action_items": kept_actions,
+        }
+    )
+    return purged, report

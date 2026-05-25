@@ -65,42 +65,66 @@ def reset_model_cache() -> None:
         _model = None
 
 
-def _read_audio_ffmpeg(audio_path: Path, sampling_rate: int) -> Any:
+def _read_audio_as_tensor(audio_path: Path, sampling_rate: int) -> Any:
     """
-    Decodifica `audio_path` (qualquer formato suportado pelo ffmpeg) para
-    um torch.Tensor 1-D float32 normalizado em [-1, 1] no `sampling_rate`
-    pedido.
+    Lê áudio do disco e devolve `torch.Tensor` mono 1-D em `sampling_rate`.
 
-    Usado em vez de `silero_vad.read_audio` / `torchaudio.load` porque:
-    - silero-vad 5.1.2 chama `torchaudio.list_audio_backends()` (removida em
-      torchaudio 2.7+; pyannote.audio 4.x exige torchaudio 2.11+).
-    - silero-vad 6.x usa `torchcodec`, cuja DLL nativa não carrega no Windows
-      (`libtorchcodec_core4.dll`).
-    - Bypassamos torchaudio totalmente: o ffmpeg já está no PATH como dep
-      do projeto desde a Etapa 0.1.
+    Substitui `silero_vad.read_audio()`, que internamente chama
+    `torchaudio.list_audio_backends()` — função REMOVIDA no torchaudio
+    2.9+. Como o projeto pode usar torchaudio 2.11+ (puxado por
+    pyannote), o read_audio do silero crasha com AttributeError.
+
+    Pipeline:
+    1. ffmpeg (via imageio-ffmpeg) → WAV mono 16kHz em memória (stream)
+    2. soundfile lê o WAV → numpy float32
+    3. torch.from_numpy → Tensor 1-D
+
+    Usar ffmpeg em vez de soundfile direto porque o input pode ser
+    qualquer formato (MP3, MP4, M4A, etc.) — soundfile só lê WAV/FLAC/OGG.
+    O MP3 otimizado que vem do converter passa direto também, sem
+    re-encode pesado (só decode pra PCM).
     """
-    import ffmpeg
+    import subprocess
+
     import numpy as np
     import torch
 
-    # Pipe de PCM 16-bit signed little-endian (s16le): formato bruto,
-    # determinístico, sem header. Convertemos pra mono no sample rate alvo.
-    out, _ = (
-        ffmpeg.input(str(audio_path))
-        .output(
-            "pipe:",
-            format="s16le",
-            acodec="pcm_s16le",
-            ac=1,
-            ar=sampling_rate,
-            loglevel="error",
-        )
-        .run(capture_stdout=True, capture_stderr=True)
+    from app.services.audio.converter import _ffmpeg_exe
+
+    # ffmpeg → WAV PCM s16le mono no stdout. Pipe binário direto, não
+    # toca em disco temporário.
+    cmd = [
+        _ffmpeg_exe(),
+        "-loglevel",
+        "error",
+        "-i",
+        str(audio_path),
+        "-f",
+        "s16le",  # raw PCM signed 16-bit little-endian
+        "-acodec",
+        "pcm_s16le",
+        "-ac",
+        "1",  # mono
+        "-ar",
+        str(sampling_rate),
+        "-",  # stdout
+    ]
+    proc = subprocess.run(
+        cmd,
+        capture_output=True,
+        check=False,
+        # Em Windows sem essa flag, abre cmd window quando rodado do
+        # bundle PyInstaller --windowed.
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
-    samples_int16 = np.frombuffer(out, dtype=np.int16)
-    # Normaliza pra [-1, 1] em float32 (range esperado pelo modelo Silero).
-    samples_float = samples_int16.astype(np.float32) / 32768.0
-    return torch.from_numpy(samples_float)
+    if proc.returncode != 0:
+        stderr = proc.stderr.decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"ffmpeg falhou ao decodificar áudio pro VAD: {stderr}")
+
+    # Converte PCM s16le → float32 normalizado em [-1, 1] (formato esperado
+    # pelo silero, equivalente ao que torchaudio.load entrega).
+    pcm = np.frombuffer(proc.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+    return torch.from_numpy(pcm)
 
 
 def detect_speech_segments(
@@ -122,7 +146,10 @@ def detect_speech_segments(
     from silero_vad import get_speech_timestamps
 
     model = _get_model()
-    wav = _read_audio_ffmpeg(audio_path, sampling_rate=SILERO_SAMPLE_RATE)
+    # Usa wrapper próprio (ffmpeg → numpy → tensor) em vez de
+    # silero_vad.read_audio() — esse último depende de
+    # torchaudio.list_audio_backends() que foi removida em torchaudio 2.9+.
+    wav = _read_audio_as_tensor(audio_path, sampling_rate=SILERO_SAMPLE_RATE)
 
     raw_timestamps = get_speech_timestamps(
         wav,

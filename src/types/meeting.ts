@@ -168,11 +168,13 @@ export type ApiKeyProvider =
   | "openai"
   | "google";
 
+export type ValidationStatus = "valid" | "invalid" | "error";
+
 export interface ProviderStatus {
   provider: ApiKeyProvider;
   is_configured: boolean;
   last_validated_at: string | null;
-  last_validation_status: "success" | "failed" | "invalid" | null;
+  last_validation_status: ValidationStatus | null;
   notes: string | null;
 }
 
@@ -183,4 +185,21 @@ export interface ProvidersListResponse {
 export interface SimpleStatusResponse {
   provider: ApiKeyProvider;
   is_configured: boolean;
+}
+
+/**
+ * POST /api/keys/{provider}/test request body.
+ * - `key` preenchido: testa o valor novo SEM salvar (pre-validação)
+ * - `key` omitido: testa a chave já salva no keyring
+ */
+export interface TestKeyRequest {
+  key?: string;
+}
+
+export interface TestKeyResponse {
+  provider: ApiKeyProvider;
+  status: ValidationStatus;
+  message: string | null;
+  http_status: number | null;
+  latency_ms: number;
 }

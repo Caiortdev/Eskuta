@@ -1,9 +1,12 @@
 """
 Testes do VAD (app.services.audio.vad).
 
-Mockamos `silero_vad.load_silero_vad`, `read_audio` e
-`get_speech_timestamps` pra evitar baixar modelo (~30MB) ou precisar
-de áudio real nos testes unitários.
+Mockamos:
+- `silero_vad.load_silero_vad` pra não baixar modelo (~30MB)
+- `silero_vad.get_speech_timestamps` pra fixar timestamps esperados
+- `app.services.audio.vad._read_audio_as_tensor` pra não rodar ffmpeg
+  em arquivo vazio (nosso wrapper substitui silero_vad.read_audio,
+  que chamava torchaudio.list_audio_backends — removida em 2.9+).
 """
 
 from __future__ import annotations
@@ -57,7 +60,7 @@ def test_detect_converts_raw_timestamps_to_seconds(tmp_path: Path) -> None:
 
     with (
         patch("silero_vad.load_silero_vad", return_value="fake-model"),
-        patch("app.services.audio.vad._read_audio_ffmpeg", return_value="fake-wav"),
+        patch("app.services.audio.vad._read_audio_as_tensor", return_value="fake-wav"),
         patch("silero_vad.get_speech_timestamps", return_value=raw) as gst,
     ):
         segments = detect_speech_segments(audio)
@@ -78,7 +81,7 @@ def test_custom_thresholds_propagate(tmp_path: Path) -> None:
     audio = _existing_audio(tmp_path)
     with (
         patch("silero_vad.load_silero_vad", return_value="fake-model"),
-        patch("app.services.audio.vad._read_audio_ffmpeg", return_value="fake-wav"),
+        patch("app.services.audio.vad._read_audio_as_tensor", return_value="fake-wav"),
         patch("silero_vad.get_speech_timestamps", return_value=[]) as gst,
     ):
         detect_speech_segments(
@@ -99,7 +102,7 @@ def test_model_loaded_only_once_across_calls(tmp_path: Path) -> None:
     audio = _existing_audio(tmp_path)
     with (
         patch("silero_vad.load_silero_vad", return_value="fake-model") as load_mock,
-        patch("app.services.audio.vad._read_audio_ffmpeg", return_value="fake-wav"),
+        patch("app.services.audio.vad._read_audio_as_tensor", return_value="fake-wav"),
         patch("silero_vad.get_speech_timestamps", return_value=[]),
     ):
         detect_speech_segments(audio)
@@ -113,7 +116,7 @@ def test_reset_model_cache_forces_reload(tmp_path: Path) -> None:
     audio = _existing_audio(tmp_path)
     with (
         patch("silero_vad.load_silero_vad", return_value="fake-model") as load_mock,
-        patch("app.services.audio.vad._read_audio_ffmpeg", return_value="fake-wav"),
+        patch("app.services.audio.vad._read_audio_as_tensor", return_value="fake-wav"),
         patch("silero_vad.get_speech_timestamps", return_value=[]),
     ):
         detect_speech_segments(audio)
@@ -136,7 +139,7 @@ def test_empty_timestamps_returns_empty_list(tmp_path: Path) -> None:
     audio = _existing_audio(tmp_path)
     with (
         patch("silero_vad.load_silero_vad", return_value="fake-model"),
-        patch("app.services.audio.vad._read_audio_ffmpeg", return_value="fake-wav"),
+        patch("app.services.audio.vad._read_audio_as_tensor", return_value="fake-wav"),
         patch("silero_vad.get_speech_timestamps", return_value=[]),
     ):
         assert detect_speech_segments(audio) == []

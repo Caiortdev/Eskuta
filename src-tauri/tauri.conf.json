@@ -13,17 +13,24 @@
     "windows": [
       {
         "title": "Eskuta",
-        "width": 800,
-        "height": 600
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: https://asset.localhost; font-src 'self' data:; connect-src 'self' http://127.0.0.1:8765 https://api.github.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["msi", "nsis"],
+    "category": "Productivity",
+    "shortDescription": "Áudio de reunião em ata estruturada",
+    "longDescription": "Eskuta transforma gravações de reuniões em atas estruturadas (sumário, decisões, ações) usando STT + LLM. Tudo local — chaves de API ficam no keyring do sistema.",
+    "publisher": "Caio Torres",
+    "homepage": "https://github.com/Caiortdev/Eskuta",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -31,6 +38,26 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/eskuta-sidecar"]
+    "resources": ["binaries/eskuta-sidecar/**/*", "binaries/eskuta-sidecar/*"],
+    "windows": {
+      "wix": {
+        "language": ["pt-BR", "en-US"]
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false,
+        "languages": ["PortugueseBR", "English"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "dialog": false,
+      "endpoints": [
+        "https://eskuta-updates.example.com/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "REPLACE_WITH_PUBKEY_FROM_scripts_generate-update-keys.ps1"
+    }
   }
 }

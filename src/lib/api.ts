@@ -17,6 +17,7 @@ import type {
   ProvidersListResponse,
   SimpleStatusResponse,
   SpeakerMap,
+  TestKeyResponse,
 } from "@/types/meeting";
 
 const SIDECAR_BASE_URL = "http://127.0.0.1:8765";
@@ -48,11 +49,20 @@ export interface HealthResponse {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Content-Type só pra requests com body (POST/PUT/PATCH). Em GET/DELETE,
+  // adicionar Content-Type força CORS preflight desnecessário (request
+  // deixa de ser "simple") — em Tauri webview isso pode falhar
+  // silenciosamente com "Failed to fetch".
+  const hasBody = init?.body != null;
+  const baseHeaders: Record<string, string> = hasBody
+    ? { "Content-Type": "application/json" }
+    : {};
+
   const res = await fetch(`${SIDECAR_BASE_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
+      ...baseHeaders,
+      ...(init?.headers as Record<string, string> | undefined),
     },
   });
 
@@ -106,13 +116,13 @@ export const api = {
       if (params.limit !== undefined) qs.set("limit", String(params.limit));
       if (params.offset !== undefined) qs.set("offset", String(params.offset));
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
-      return request<MeetingListResponse>(`/meetings${suffix}`);
+      return request<MeetingListResponse>(`/api/meetings${suffix}`);
     },
 
-    get: (id: string) => request<MeetingDetail>(`/meetings/${id}`),
+    get: (id: string) => request<MeetingDetail>(`/api/meetings/${id}`),
 
     status: (id: string) =>
-      request<MeetingStatusResponse>(`/meetings/${id}/status`),
+      request<MeetingStatusResponse>(`/api/meetings/${id}/status`),
 
     upload: (file: File, options?: { title?: string; language?: string }) => {
       const formData = new FormData();
@@ -121,17 +131,20 @@ export const api = {
       if (options?.title) qs.set("title", options.title);
       if (options?.language) qs.set("language", options.language);
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
-      return requestForm<MeetingCreated>(`/meetings/upload${suffix}`, formData);
+      return requestForm<MeetingCreated>(
+        `/api/meetings/upload${suffix}`,
+        formData,
+      );
     },
 
     updateSpeakerMap: (id: string, speakerMap: Record<string, string>) =>
-      request<SpeakerMap>(`/meetings/${id}/speaker-map`, {
+      request<SpeakerMap>(`/api/meetings/${id}/speaker-map`, {
         method: "PUT",
         body: JSON.stringify({ speaker_map: speakerMap }),
       }),
 
     delete: (id: string) =>
-      request<DeleteResponse>(`/meetings/${id}`, { method: "DELETE" }),
+      request<DeleteResponse>(`/api/meetings/${id}`, { method: "DELETE" }),
   },
 
   keys: {
@@ -147,11 +160,39 @@ export const api = {
       request<SimpleStatusResponse>(`/api/keys/${provider}`, {
         method: "DELETE",
       }),
+
+    /**
+     * Testa a chave do provider chamando endpoint cheap (lista de modelos).
+     * Se `key` é fornecido, testa esse valor SEM salvar (pré-validação).
+     * Se omitido, testa a chave atualmente no keyring.
+     *
+     * Retorna sempre 200 — o veredito está em `status` ("valid" | "invalid" | "error").
+     */
+    test: (provider: ApiKeyProvider, key?: string) =>
+      request<TestKeyResponse>(`/api/keys/${provider}/test`, {
+        method: "POST",
+        body: JSON.stringify({ key: key ?? null }),
+      }),
+  },
+
+  diagnostics: {
+    /**
+     * Exporta logs com API keys mascaradas como ZIP.
+     * Retorna Blob — chamador deve disparar download via URL.createObjectURL.
+     */
+    exportLogs: async (): Promise<Blob> => {
+      const url = `${SIDECAR_BASE_URL}/api/diagnostics/export-logs`;
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) {
+        throw new ApiError(res.status, await res.text().catch(() => null));
+      }
+      return res.blob();
+    },
   },
 
   transcribe: {
     start: (meetingId: string) =>
-      request<{ status: string; meeting_id: string }>("/transcribe/start", {
+      request<{ status: string; meeting_id: string }>("/api/transcribe/start", {
         method: "POST",
         body: JSON.stringify({ meeting_id: meetingId }),
       }),

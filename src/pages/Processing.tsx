@@ -16,7 +16,21 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { MeetingStatusResponse } from "@/types/meeting";
 
-const POLL_INTERVAL_MS = 2000;
+// Polling com backoff exponencial — minimiza load no sidecar pra reuniões
+// longas. Começa em 1s e sobe até 8s, com jitter pra evitar thundering herd.
+const POLL_BASE_MS = 1000;
+const POLL_MAX_MS = 8000;
+const POLL_GROWTH = 1.5;
+
+function nextPollInterval(attempt: number): number {
+  const exp = Math.min(
+    POLL_MAX_MS,
+    POLL_BASE_MS * Math.pow(POLL_GROWTH, attempt),
+  );
+  // Jitter ±15% pra dispersar requisições
+  const jitter = exp * (Math.random() * 0.3 - 0.15);
+  return Math.round(exp + jitter);
+}
 
 export function ProcessingPage() {
   const params = useParams<{ id: string }>();
@@ -29,6 +43,7 @@ export function ProcessingPage() {
   useEffect(() => {
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
 
     const tick = async () => {
       try {
@@ -43,7 +58,9 @@ export function ProcessingPage() {
         if (next.status === "failed") {
           return; // não continua polling
         }
-        timeout = setTimeout(tick, POLL_INTERVAL_MS);
+        // Backoff exponencial — menos load no sidecar pra reuniões longas
+        timeout = setTimeout(tick, nextPollInterval(attempt));
+        attempt += 1;
       } catch (err) {
         if (cancelled) return;
         const msg =

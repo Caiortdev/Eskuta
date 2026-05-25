@@ -15,6 +15,9 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
     css: false,
+    // e2e/ é Playwright (não vitest). Excluímos do testMatch pra evitar
+    // import error de "@playwright/test" que não é dep do vitest.
+    exclude: ["node_modules/**", "dist/**", "e2e/**"],
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
@@ -25,6 +28,7 @@ export default defineConfig({
         "src/components/ui/**", // Shadcn components (cópia do upstream)
         "src/types/**", // Pure type declarations (no runtime code)
         "src/**/*.test.{ts,tsx}",
+        "e2e/**", // Playwright E2E tests, não vitest
       ],
       reporter: ["text", "html"],
       thresholds: {
