@@ -135,8 +135,8 @@ def detect_speech_segments(
     threshold: float = DEFAULT_THRESHOLD,
 ) -> list[SpeechSegment]:
     """
-    Detecta trechos de fala em `audio_path` (precisa estar em 16kHz mono;
-    use `convert_to_optimized_mp3` antes pra garantir).
+    Detecta trechos de fala em `audio_path` (qualquer formato suportado pelo
+    ffmpeg — não precisa estar pré-convertido).
 
     Retorna lista de `SpeechSegment` ordenada por `start_sec`.
     """
