@@ -31,6 +31,10 @@ DEFAULT_THRESHOLD = 0.5
 _model: Any | None = None
 _model_lock = Lock()
 
+# Threshold em dBFS pra distinguir "áudio quase silente" de "áudio com som
+# mas sem fala detectável pelo VAD" — vide `NoSpeechDetectedError`.
+SILENCE_DB_THRESHOLD = -60.0
+
 
 @dataclass(frozen=True)
 class SpeechSegment:
@@ -42,6 +46,35 @@ class SpeechSegment:
     @property
     def duration_sec(self) -> float:
         return self.end_sec - self.start_sec
+
+
+class NoSpeechDetectedError(RuntimeError):
+    """
+    Áudio existe mas o VAD não conseguiu detectar nenhum trecho de fala.
+
+    Pode ser:
+    - **silent_audio**: o arquivo tá praticamente em silêncio absoluto (volume
+      médio abaixo de `SILENCE_DB_THRESHOLD`). Microfone provavelmente desligado
+      no momento da gravação.
+    - **no_speech**: o arquivo tem som (música, ruído, animais) mas nenhuma
+      fala humana foi detectada — pode ser idioma/qualidade/efeitos.
+
+    A mensagem (`args[0]`) é amigável e pode ser mostrada direto ao usuário
+    pelo frontend.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: str,
+        volume_db: float,
+        duration_sec: float,
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason  # "silent_audio" | "no_speech"
+        self.volume_db = volume_db
+        self.duration_sec = duration_sec
 
 
 def _get_model() -> Any:
@@ -103,6 +136,23 @@ def _read_audio_ffmpeg(audio_path: Path, sampling_rate: int) -> Any:
     return torch.from_numpy(samples_float)
 
 
+def compute_volume_db(wav: Any) -> float:
+    """
+    Calcula o RMS do tensor de áudio (float32 em [-1, 1]) em dBFS.
+    Retorna `-inf` se o tensor for vazio ou todo zero.
+    """
+    import math
+
+    import torch
+
+    if wav.numel() == 0:
+        return -math.inf
+    rms = float(torch.sqrt((wav.float() ** 2).mean()))
+    if rms <= 0.0:
+        return -math.inf
+    return 20.0 * math.log10(rms)
+
+
 def detect_speech_segments(
     audio_path: Path,
     *,
@@ -115,6 +165,11 @@ def detect_speech_segments(
     ffmpeg — não precisa estar pré-convertido).
 
     Retorna lista de `SpeechSegment` ordenada por `start_sec`.
+
+    Levanta `NoSpeechDetectedError` com mensagem amigável quando o VAD não
+    consegue identificar nenhum trecho de fala — distingue entre áudio
+    silente (`reason='silent_audio'`) e áudio com som mas sem fala humana
+    (`reason='no_speech'`) usando o RMS do tensor.
     """
     if not audio_path.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {audio_path}")
@@ -123,6 +178,7 @@ def detect_speech_segments(
 
     model = _get_model()
     wav = _read_audio_ffmpeg(audio_path, sampling_rate=SILERO_SAMPLE_RATE)
+    duration_sec = float(wav.numel()) / SILERO_SAMPLE_RATE
 
     raw_timestamps = get_speech_timestamps(
         wav,
@@ -146,4 +202,34 @@ def detect_speech_segments(
         segments=len(segments),
         total_speech_sec=round(sum(s.duration_sec for s in segments), 2),
     )
+
+    if not segments:
+        volume_db = compute_volume_db(wav)
+        if volume_db <= SILENCE_DB_THRESHOLD:
+            display_db = "−∞" if volume_db == float("-inf") else f"{volume_db:.1f}"
+            message = (
+                f"Áudio sem som detectável (volume médio {display_db} dB). "
+                "Verifique se o microfone estava ligado durante a gravação."
+            )
+            reason = "silent_audio"
+        else:
+            message = (
+                f"Áudio tem som (volume médio {volume_db:.1f} dB) mas nenhuma fala "
+                "humana foi detectada. Pode ser música, ruído ambiente, ou idioma "
+                "fora do esperado. Suba um arquivo com voz em português."
+            )
+            reason = "no_speech"
+        logger.warning(
+            "Nenhum trecho de fala detectado",
+            audio=str(audio_path),
+            reason=reason,
+            volume_db=round(volume_db, 2) if volume_db != float("-inf") else "-inf",
+        )
+        raise NoSpeechDetectedError(
+            message,
+            reason=reason,
+            volume_db=volume_db,
+            duration_sec=duration_sec,
+        )
+
     return segments

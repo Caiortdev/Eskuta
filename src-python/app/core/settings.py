@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     # ============================================================
     # Limites operacionais
     # ============================================================
-    MAX_AUDIO_MB: int = 500
+    MAX_AUDIO_MB: int = 5120  # 5 GiB — reuniões de 2-3h em alta qualidade cabem
     CHUNK_DURATION_SEC: int = 600  # 10 min por chunk de áudio
     MAX_PARALLEL_CHUNKS: int = 4  # respeita free tier do Groq
     HTTP_TIMEOUT_SEC: int = 60

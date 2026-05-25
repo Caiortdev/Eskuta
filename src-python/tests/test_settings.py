@@ -28,7 +28,7 @@ def test_default_preferences() -> None:
 
 def test_default_limits() -> None:
     s = Settings()
-    assert s.MAX_AUDIO_MB == 500
+    assert s.MAX_AUDIO_MB == 5120
     assert s.CHUNK_DURATION_SEC == 600
     assert s.MAX_PARALLEL_CHUNKS == 4
 
